@@ -6,9 +6,9 @@ import type {
   DispatchResult,
   HistoryEntry,
   InstanceSnapshot,
+  IJoinState,
 } from '../types/index.js';
 import { StateKind, StateStatus } from '../types/index.js';
-import type { IForkState, IJoinState } from '../types/index.js';
 import type { GuardRegistry } from './registry.js';
 
 /**
@@ -169,8 +169,7 @@ export class WorkflowEngine {
         if (state.kind !== StateKind.Join) continue;
         if (newStatuses.get(id) !== StateStatus.Idle) continue;
 
-        const join = state as IJoinState;
-        if (WorkflowEngine.joinConditionMet(join, newStatuses)) {
+        if (WorkflowEngine.joinConditionMet(state, newStatuses)) {
           newStatuses.set(id, StateStatus.Active);
           enteredStates.push(id);
           changed = true;
@@ -206,8 +205,7 @@ export class WorkflowEngine {
       case StateKind.Fork: {
         // ForkState is transient — complete it immediately and fan out to targets
         statuses.set(stateId, StateStatus.Completed);
-        const fork = state as IForkState;
-        for (const target of fork.targets) {
+        for (const target of state.targets) {
           WorkflowEngine.enterState(target, definition, statuses, entered);
         }
         break;

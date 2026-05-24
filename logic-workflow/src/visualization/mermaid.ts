@@ -1,6 +1,5 @@
 import type { WorkflowDefinition, InstanceSnapshot } from '../types/index.js';
 import { StateKind, StateStatus } from '../types/index.js';
-import type { IForkState, IJoinState, ISubWorkflowState } from '../types/index.js';
 import type { IExporter } from './exporter.js';
 
 /**
@@ -61,8 +60,7 @@ export const MermaidExporter: IExporter<string> = {
           lines.push(`  [*] --> ${sid} : fork`);
         }
       } else if (state.kind === StateKind.SubWorkflow) {
-        const sub = state as ISubWorkflowState;
-        lines.push(`  state "${label} [${sub.subWorkflowName}]" as ${sid}`);
+        lines.push(`  state "${label} [${state.subWorkflowName}]" as ${sid}`);
       } else {
         lines.push(`  ${sid} : ${label}`);
       }
@@ -83,8 +81,7 @@ export const MermaidExporter: IExporter<string> = {
     // ForkState fan-out arrows (informational, shown separately)
     for (const [id, state] of definition.states) {
       if (state.kind === StateKind.Fork) {
-        const fork = state as IForkState;
-        for (const target of fork.targets) {
+        for (const target of state.targets) {
           lines.push(`  ${sanitizeId(id)} --> ${sanitizeId(target)}`);
         }
       }
@@ -93,8 +90,7 @@ export const MermaidExporter: IExporter<string> = {
     // JoinState required-inputs annotations
     for (const [id, state] of definition.states) {
       if (state.kind === StateKind.Join) {
-        const join = state as IJoinState;
-        for (const req of join.requires) {
+        for (const req of state.requires) {
           lines.push(`  ${sanitizeId(req)} --> ${sanitizeId(id)} : ✓`);
         }
       }
@@ -109,7 +105,7 @@ export const MermaidExporter: IExporter<string> = {
     if (snapshot) {
       lines.push('');
       for (const [id, status] of Object.entries(snapshot.stateStatuses)) {
-        const cls = STATUS_CLASS[status as StateStatus];
+        const cls = STATUS_CLASS[status];
         if (cls) lines.push(`  class ${sanitizeId(id)} ${cls}`);
       }
     }

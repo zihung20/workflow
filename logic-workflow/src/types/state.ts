@@ -87,3 +87,20 @@ export interface ISubWorkflowState extends IState {
   /** Name of the external workflow definition this state delegates to. */
   readonly subWorkflowName: string;
 }
+
+/**
+ * A `StepState` — the fundamental SOP milestone. Becomes `active` when
+ * entered and waits for an explicit dispatched action to transition out.
+ */
+export interface IStepState extends IState {
+  readonly kind: StateKind.Step;
+}
+
+/**
+ * Discriminated union of all built-in state kinds.
+ *
+ * Typed as the map value in `WorkflowDefinition.states` and `StateRegistry`
+ * so that the engine and visualization layer can narrow to a specific state
+ * interface via a `kind` check without unsafe casts.
+ */
+export type AnyState = IStepState | IForkState | IJoinState | ISubWorkflowState;

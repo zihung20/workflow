@@ -1,4 +1,5 @@
 import { StateKind } from '../types/index.js';
+import type { IStepState } from '../types/index.js';
 import { BaseState } from './base.js';
 
 /**
@@ -8,7 +9,7 @@ import { BaseState } from './base.js';
  * Every workflow must have at least one `StepState` as its initial state and
  * at least one as a terminal state.
  */
-export class StepState<TId extends string = string> extends BaseState<TId> {
+export class StepState<TId extends string = string> extends BaseState<TId> implements IStepState {
   readonly kind = StateKind.Step;
 
   /**

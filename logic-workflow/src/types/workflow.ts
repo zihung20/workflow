@@ -1,5 +1,5 @@
 import type { ZodSchema } from 'zod';
-import type { IState } from './state.js';
+import type { AnyState } from './state.js';
 import type { TransitionDefinition } from './transition.js';
 
 /**
@@ -20,7 +20,7 @@ export interface WorkflowDefinition {
   readonly name: string;
 
   /** All states in the graph, keyed by state ID. */
-  readonly states: ReadonlyMap<string, IState>;
+  readonly states: ReadonlyMap<string, AnyState>;
 
   /** All declared transitions. */
   readonly transitions: readonly TransitionDefinition[];

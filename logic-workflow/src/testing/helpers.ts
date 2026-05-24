@@ -1,5 +1,5 @@
-import type { GuardContext, ReadonlyInstanceState } from '../src/types/index.js';
-import { StateStatus } from '../src/types/index.js';
+import type { GuardContext, ReadonlyInstanceState } from '../types/index.js';
+import { StateStatus } from '../types/index.js';
 
 /**
  * Creates a minimal `GuardContext` for unit-testing individual guards.

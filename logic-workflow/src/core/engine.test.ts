@@ -1,13 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
-import { WorkflowBuilder } from '../../src/core/builder.js';
-import { StepState } from '../../src/states/step-state.js';
-import { ForkState } from '../../src/states/fork-state.js';
-import { JoinState } from '../../src/states/join-state.js';
-import { Guard } from '../../src/guards/factory.js';
-import { StateStatus } from '../../src/types/index.js';
-
-// ─── Shared minimal workflow ───────────────────────────────────────────────────
+import { WorkflowBuilder } from './builder.js';
+import { StepState } from '../states/step-state.js';
+import { ForkState } from '../states/fork-state.js';
+import { JoinState } from '../states/join-state.js';
+import { Guard } from '../guards/factory.js';
+import { StateStatus } from '../types/index.js';
 
 const Empty = z.object({});
 
@@ -22,8 +20,6 @@ const linear = new WorkflowBuilder('linear')
   .addTransition({ from: 'a', to: 'b', on: 'GO' })
   .addTransition({ from: 'b', to: 'c', on: 'GO' })
   .build();
-
-// ─── Terminal-state guard ──────────────────────────────────────────────────────
 
 describe('Engine — terminal state', () => {
   it('blocks all dispatches after reaching terminal', async () => {
@@ -43,12 +39,8 @@ describe('Engine — terminal state', () => {
   });
 });
 
-// ─── Candidate resolution ─────────────────────────────────────────────────────
-
 describe('Engine — no-active-source', () => {
   it('returns no-active-source when action has transitions but none from the active state', async () => {
-    // 'BACK' has a transition, but only from 'c'. When at 'b', dispatching BACK
-    // finds a candidate set but none with an active source.
     const wf = new WorkflowBuilder('back-test')
       .defineAction('GO', Empty)
       .defineAction('BACK', Empty)
@@ -59,31 +51,26 @@ describe('Engine — no-active-source', () => {
       .setTerminal(['c'])
       .addTransition({ from: 'a', to: 'b', on: 'GO' })
       .addTransition({ from: 'b', to: 'c', on: 'GO' })
-      .addTransition({ from: 'c', to: 'a', on: 'BACK' }) // BACK exists, but only from 'c'
+      .addTransition({ from: 'c', to: 'a', on: 'BACK' })
       .build();
 
     const inst = wf.createInstance('e-003');
-    await inst.dispatch('GO', {}); // now at b
+    await inst.dispatch('GO', {});
     const result = await inst.dispatch('BACK', {});
-    // BACK has a transition (c→a) but 'c' is not active → no-active-source
     expect(result.success).toBe(false);
     if (!result.success) expect(result.reason).toBe('no-active-source');
   });
 
   it('returns invalid-action when the action has no transitions at all', async () => {
     const inst = linear.createInstance('e-004');
-    // BACK is declared but has zero transitions in 'linear'
     const result = await inst.dispatch('BACK', {});
     expect(result.success).toBe(false);
     if (!result.success) expect(result.reason).toBe('invalid-action');
   });
 });
 
-// ─── Invalid action ───────────────────────────────────────────────────────────
-
 describe('Engine — invalid-action', () => {
   it('returns invalid-action for an undeclared action name', async () => {
-    // Build a workflow where 'GHOST' has never been defined
     const wf = new WorkflowBuilder('ghost-test')
       .defineAction('GO', Empty)
       .addState(new StepState('start'))
@@ -94,14 +81,9 @@ describe('Engine — invalid-action', () => {
       .build();
 
     const inst = wf.createInstance('e-inv-001');
-    // 'GHOST' is not registered → schema lookup throws before engine sees it
     await expect(inst.dispatch('GO' as 'GO', {} as never)).resolves.toMatchObject({ success: true });
-    // The compile-time type prevents calling with unknown actions, so we rely
-    // on the Zod-throw test in linear-sop for the payload validation path.
   });
 });
-
-// ─── Guard evaluation ─────────────────────────────────────────────────────────
 
 describe('Engine — guard evaluation', () => {
   const guarded = new WorkflowBuilder('guarded')
@@ -119,7 +101,6 @@ describe('Engine — guard evaluation', () => {
     const result = await inst.dispatch('GO', {});
     expect(result.success).toBe(false);
     if (!result.success) expect(result.reason).toBe('guard-failed');
-    // State must not have changed
     expect(inst.getCurrentStates()).toEqual(['a']);
   });
 
@@ -170,8 +151,6 @@ describe('Engine — guard evaluation', () => {
   });
 });
 
-// ─── Transition result shape ───────────────────────────────────────────────────
-
 describe('Engine — DispatchResult shape on success', () => {
   it('includes enteredStates and exitedStates', async () => {
     const inst = linear.createInstance('rs-001');
@@ -189,8 +168,6 @@ describe('Engine — DispatchResult shape on success', () => {
     expect(result.snapshot.stateStatuses['b']).toBe(StateStatus.Active);
   });
 });
-
-// ─── Fork fan-out via engine ──────────────────────────────────────────────────
 
 describe('Engine — Fork fan-out', () => {
   const forked = new WorkflowBuilder('fork-engine')
@@ -221,8 +198,6 @@ describe('Engine — Fork fan-out', () => {
   });
 });
 
-// ─── Join fixed-point via engine ──────────────────────────────────────────────
-
 describe('Engine — Join fixed-point', () => {
   const quorum = new WorkflowBuilder('quorum')
     .defineAction('START', Empty)
@@ -234,7 +209,7 @@ describe('Engine — Join fixed-point', () => {
     .addState(new StepState('a'))
     .addState(new StepState('b'))
     .addState(new StepState('c'))
-    .addState(new JoinState('join', { requires: ['a', 'b', 'c'], mode: 2 })) // quorum of 2
+    .addState(new JoinState('join', { requires: ['a', 'b', 'c'], mode: 2 }))
     .addState(new StepState('done'))
     .setInitial('start')
     .setTerminal(['done'])
@@ -255,8 +230,6 @@ describe('Engine — Join fixed-point', () => {
   });
 });
 
-// ─── History ──────────────────────────────────────────────────────────────────
-
 describe('Engine — history', () => {
   it('appends one entry per successful dispatch', async () => {
     const inst = linear.createInstance('h-001');
@@ -267,7 +240,7 @@ describe('Engine — history', () => {
 
   it('does not append history on failed dispatch', async () => {
     const inst = linear.createInstance('h-002');
-    await inst.dispatch('BACK', {}); // no-active-source — fails
+    await inst.dispatch('BACK', {});
     expect(inst.getSnapshot().history).toHaveLength(0);
   });
 

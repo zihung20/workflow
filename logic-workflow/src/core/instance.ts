@@ -7,7 +7,6 @@ import type {
   GuardFn,
 } from '../types/index.js';
 import { StateStatus, StateKind } from '../types/index.js';
-import type { ISubWorkflowState } from '../types/index.js';
 import { GuardRegistry } from './registry.js';
 import { WorkflowEngine } from './engine.js';
 
@@ -238,9 +237,6 @@ export class WorkflowInstance<TActions extends ActionPayloadMap> {
       history: [...this.snapshot.history, historyEntry],
       updatedAt: historyEntry.at,
     };
-
-    // Suppress unused variable warning — stored for documentation purposes
-    void (state as ISubWorkflowState).subWorkflowName;
   }
 
   // ─── Persistence ──────────────────────────────────────────────────────────

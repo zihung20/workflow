@@ -392,3 +392,50 @@ pnpm dev                          # → http://localhost:5173
   re-renders). Selected-section snapshot and available actions are derived from that map.
 
 `tsc --noEmit` and `vite build` both exit clean.
+
+### 2026-05-24 — Type soundness, testing pyramid, and architecture cleanup
+
+#### Discriminated union — zero eliminatable casts
+- `src/types/state.ts` — added `IStepState` interface (`kind: StateKind.Step` literal) and
+  `AnyState = IStepState | IForkState | IJoinState | ISubWorkflowState` union type.
+- `src/types/workflow.ts` — `WorkflowDefinition.states` changed from
+  `ReadonlyMap<string, IState>` to `ReadonlyMap<string, AnyState>`.
+- `src/types/index.ts`, `src/index.ts` — export `IStepState` and `AnyState`.
+- `src/states/step-state.ts` — now `implements IStepState` explicitly.
+- `src/core/registry.ts` — `StateRegistry` now typed as `Map<string, AnyState>`.
+- `src/core/builder.ts` — `addState<S extends AnyState>(...)`; removed two inline-import
+  casts in `build()` (kind checks now narrow via discriminated union).
+- `src/core/engine.ts` — removed `state as IJoinState` and `state as IForkState` casts.
+- `src/core/instance.ts` — removed `state as ISubWorkflowState` cast and dead `void` line.
+- `src/visualization/mermaid.ts` — removed 3 state casts and `status as StateStatus`.
+- `src/visualization/json-graph.ts` — removed 3 state casts.
+- Result: **11 eliminatable casts removed**. 6 remain at explicit storage-boundary or
+  generic-accumulation sites, all with justifying comments.
+
+#### Dead code deletion
+- **Deleted** `src/types/node.ts` — unused; imported from `core/` violating layer rules.
+- **Deleted** `src/core/context.ts` — only referenced by the now-deleted `node.ts`.
+
+#### Vitest workspace — three named projects
+- `vitest.workspace.ts` — defines `unit` (`src/**/*.test.ts`), `integration`
+  (`tests/integration/**/*.test.ts`), and `e2e` (`tests/e2e/**/*.test.ts`) projects.
+- `vitest.config.ts` — trimmed to global shared settings + coverage exclusions.
+- `package.json` — added `test:unit`, `test:integration`, `test:e2e` scripts.
+- `tsconfig.build.json` — added `src/**/*.test.ts` and `src/testing` to `exclude`.
+
+#### Test co-location
+- Moved guard unit tests (`tests/guards/*.test.ts` → `src/guards/*.test.ts`) and
+  core unit tests (`tests/core/*.test.ts` → `src/core/*.test.ts`) next to their source.
+- Moved `tests/helpers.ts` → `src/testing/helpers.ts`.
+
+#### New unit tests (co-located in `src/`)
+- `src/types/state.test.ts`, `src/states/*.test.ts` — constructors, kinds, validation.
+- `src/core/registry.test.ts` — duplicate, missing-key, snapshot-independence, overwrite.
+- `src/core/instance.test.ts` — snapshot round-trip, transitions, canExecute, resolveSubWorkflow.
+
+#### New E2E invariant tests
+- `tests/e2e/workflow-invariants.test.ts` — 21 tests: version counter, history accuracy,
+  JSON round-trip, terminal rejection, available-transitions, SubWorkflow lifecycle.
+
+**Test count: 74 → 141 (all passing). No API surface changes.**
+**Verification:** `pnpm typecheck && pnpm test && pnpm build` all exit clean.

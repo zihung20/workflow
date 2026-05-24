@@ -1,4 +1,4 @@
-import type { IState } from '../types/index.js';
+import type { AnyState } from '../types/index.js';
 import type { GuardFn } from '../types/index.js';
 
 /**
@@ -8,7 +8,7 @@ import type { GuardFn } from '../types/index.js';
  * `build()` time via `snapshot()`.
  */
 export class StateRegistry {
-  private readonly states = new Map<string, IState>();
+  private readonly states = new Map<string, AnyState>();
 
   /**
    * Adds a state to the registry.
@@ -16,7 +16,7 @@ export class StateRegistry {
    * @param state - The state to register. Its `id` must be unique.
    * @throws {Error} If a state with the same `id` is already registered.
    */
-  register(state: IState): void {
+  register(state: AnyState): void {
     if (this.states.has(state.id)) {
       throw new Error(`State with id "${state.id}" is already registered`);
     }
@@ -29,7 +29,7 @@ export class StateRegistry {
    * @param id - The state's unique identifier.
    * @throws {Error} If no state with this ID has been registered.
    */
-  get(id: string): IState {
+  get(id: string): AnyState {
     const state = this.states.get(id);
     if (!state) throw new Error(`State "${id}" is not registered`);
     return state;
@@ -43,7 +43,7 @@ export class StateRegistry {
    * Returns an immutable snapshot of all currently registered states.
    * Called by `WorkflowBuilder.build()` to freeze the state map.
    */
-  snapshot(): ReadonlyMap<string, IState> {
+  snapshot(): ReadonlyMap<string, AnyState> {
     return new Map(this.states);
   }
 }

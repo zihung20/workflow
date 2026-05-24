@@ -287,9 +287,131 @@ The parent library must be rebuilt (`pnpm build` at the root) whenever source fi
 
 ---
 
-## Phase 3: Advanced Testing (Property-Based)
+## Phase 3: Advanced Testing, Type Soundness, and Architecture Optimization
 
-_Not yet planned. Will be added after Phase 2 is approved and complete._
+**Status:** COMPLETE ✓
+
+### Objectives
+
+1. **Zero-Casting Mandate** — eliminate every eliminatable type assertion from the core library.
+2. **Strict Testing Pyramid** — split the test suite into named unit / integration / e2e layers.
+3. **Domain-Driven Structure** — co-locate tests with their source modules; delete dead code.
+
+---
+
+### Part 1: Discriminated Union & Cast Elimination
+
+**Root cause of casts:** `WorkflowDefinition.states` was typed `ReadonlyMap<string, IState>`.
+`IState.kind` was the broad `StateKind` enum, so TypeScript could not narrow the value to
+`IForkState` / `IJoinState` / `ISubWorkflowState` after a `kind` check — every accessor required
+an explicit `as` cast.
+
+**Fix:**
+
+- `src/types/state.ts` — added `IStepState` (with `kind: StateKind.Step` as a literal type)
+  and the union `AnyState = IStepState | IForkState | IJoinState | ISubWorkflowState`.
+- `src/types/workflow.ts` — `WorkflowDefinition.states: ReadonlyMap<string, AnyState>`.
+- `src/types/index.ts`, `src/index.ts` — re-export `IStepState` and `AnyState`.
+- `src/states/step-state.ts` — explicitly `implements IStepState`.
+- `src/core/registry.ts` — `StateRegistry` uses `Map<string, AnyState>`.
+- `src/core/builder.ts` — `addState<S extends AnyState>`; inline-import casts in `build()`
+  removed (kind checks now narrow automatically).
+- `src/core/engine.ts` — removed `state as IJoinState` and `state as IForkState`.
+- `src/core/instance.ts` — removed `state as ISubWorkflowState` and dead `void` line.
+- `src/visualization/mermaid.ts` — removed 3 state casts + `status as StateStatus`.
+- `src/visualization/json-graph.ts` — removed 3 state casts.
+
+**Result:** 11 eliminatable casts removed. 6 remain at explicit storage-boundary or
+generic-accumulation sites (all justified by comments):
+
+| Cast | Location | Reason |
+|---|---|---|
+| `this as unknown as WorkflowBuilder<...>` × 2 | `builder.ts` | Generic accumulation — TypeScript cannot widen the generic without an explicit cast |
+| `schema as ZodSchema<unknown>` | `builder.ts` | Contravariant storage boundary |
+| `fn as GuardFn<unknown>` | `registry.ts` | Contravariant storage boundary |
+| `transition.guard as GuardFn/IGuard<unknown>` | `builder.ts` | Contravariant storage boundary |
+| `ctx as GuardContext<T>` | `guards/primitives.ts` | Type restoration after validated erasure |
+
+**Dead code deleted:**
+
+- `src/types/node.ts` — unused and violated the layer rule (imported from `core/`).
+- `src/core/context.ts` — only referenced by the now-deleted `node.ts`.
+
+---
+
+### Part 2: Vitest Workspace — Three Named Projects
+
+**`vitest.workspace.ts`** defines three isolated test runners:
+
+| Project | Include glob | Purpose |
+|---|---|---|
+| `unit` | `src/**/*.test.ts` | Pure in-memory tests co-located with source |
+| `integration` | `tests/integration/**/*.test.ts` | Cross-module state-machine workflows |
+| `e2e` | `tests/e2e/**/*.test.ts` | System-wide invariant assertions |
+
+**`package.json` scripts added:**
+- `test:unit` — `vitest run --project unit`
+- `test:integration` — `vitest run --project integration`
+- `test:e2e` — `vitest run --project e2e`
+
+**`tsconfig.build.json`** — added `src/**/*.test.ts` and `src/testing` to `exclude` so tsup's
+`tsc` pass never compiles co-located tests into the production bundle.
+
+---
+
+### Part 3: Test Co-location and New Tests
+
+**Moved to `src/` (unit project):**
+
+| Old path | New path |
+|---|---|
+| `tests/guards/*.test.ts` (5 files) | `src/guards/*.test.ts` |
+| `tests/core/builder.test.ts` | `src/core/builder.test.ts` |
+| `tests/core/engine.test.ts` | `src/core/engine.test.ts` |
+| `tests/helpers.ts` | `src/testing/helpers.ts` |
+
+**New unit tests (co-located in `src/`):**
+
+| File | What it covers |
+|---|---|
+| `src/types/state.test.ts` | `StateKind` / `StateStatus` enum string values and member counts |
+| `src/states/step-state.test.ts` | Constructor, `kind`, label default, empty-id guard |
+| `src/states/fork-state.test.ts` | Empty targets throws, targets frozen copy, label option |
+| `src/states/join-state.test.ts` | `all` / `any` / quorum modes, empty requires throws |
+| `src/states/sub-workflow-state.test.ts` | `subWorkflowName` stored, label option |
+| `src/core/registry.test.ts` | Duplicate registration, missing get, snapshot independence, guard overwrite |
+| `src/core/instance.test.ts` | Snapshot round-trip, `getAvailableTransitions`, `canExecute` dry-run, `resolveSubWorkflow` error paths |
+
+**New E2E invariant tests (`tests/e2e/workflow-invariants.test.ts`):**
+
+21 tests asserting structural invariants that must hold for any workflow:
+- Version counter starts at 0, increments by 1 per successful dispatch, unchanged on failure
+- History length equals successful dispatch count; timestamps are ISO-8601 and in-range
+- `JSON.parse(JSON.stringify(snapshot))` round-trip preserves all fields
+- `workflow.restoreInstance(snapshot)` produces a functionally equivalent instance
+- Terminal state rejects all further dispatches regardless of action, version unchanged
+- `getAvailableTransitions()` reflects only actions from currently active states, including post-fork multi-branch availability
+- SubWorkflow full lifecycle: `ENTER → waiting → resolveSubWorkflow → active → dispatch out`; external snapshot stored in history
+
+---
+
+### Verification
+
+```sh
+pnpm typecheck          # must exit 0
+pnpm test:unit          # 44 tests
+pnpm test:integration   # 30 tests
+pnpm test:e2e           # 21 tests
+pnpm test               # 141 total, all green
+pnpm build              # dist/ clean, no test files bundled
+
+# Confirm no eliminatable casts remain in src/
+grep -rn ' as I[A-Z]\| as StateStatus' src/ | grep -v '\.test\.'
+```
+
+**Test count: 74 → 141. No API surface changes.**
+
+---
 
 ## Phase 4: Persistence Adapter Pattern
 

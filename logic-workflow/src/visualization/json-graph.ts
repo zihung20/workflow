@@ -1,6 +1,5 @@
 import type { WorkflowDefinition, InstanceSnapshot } from '../types/index.js';
 import { StateKind } from '../types/index.js';
-import type { IForkState, IJoinState, ISubWorkflowState } from '../types/index.js';
 import type { IExporter } from './exporter.js';
 
 /**
@@ -84,14 +83,13 @@ export const JsonGraphExporter: IExporter<JsonGraph> = {
       };
 
       if (state.kind === StateKind.Fork) {
-        node.targets = [...(state as IForkState).targets];
+        node.targets = [...state.targets];
       }
       if (state.kind === StateKind.Join) {
-        const join = state as IJoinState;
-        node.join = { requires: [...join.requires], mode: join.mode };
+        node.join = { requires: [...state.requires], mode: state.mode };
       }
       if (state.kind === StateKind.SubWorkflow) {
-        node.subWorkflowName = (state as ISubWorkflowState).subWorkflowName;
+        node.subWorkflowName = state.subWorkflowName;
       }
 
       nodes.push(node);

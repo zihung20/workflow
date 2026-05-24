@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { AndGuard } from '../../src/guards/and-guard.js';
-import { AlwaysGuard, NeverGuard } from '../../src/guards/primitives.js';
-import { makeCtx } from '../helpers.js';
+import { AndGuard } from './and-guard.js';
+import { AlwaysGuard, NeverGuard } from './primitives.js';
+import { makeCtx } from '../testing/helpers.js';
 
 describe('AndGuard', () => {
   it('passes when all child guards pass', async () => {

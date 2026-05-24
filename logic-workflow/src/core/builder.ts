@@ -1,5 +1,5 @@
 import { type ZodSchema } from 'zod';
-import type { IState, TransitionDefinition, ActionPayloadMap, WorkflowDefinition, IGuard, GuardFn } from '../types/index.js';
+import type { AnyState, TransitionDefinition, ActionPayloadMap, WorkflowDefinition, IGuard, GuardFn } from '../types/index.js';
 import { StateKind } from '../types/index.js';
 import { StateRegistry } from './registry.js';
 import { Workflow } from './workflow.js';
@@ -75,7 +75,7 @@ export class WorkflowBuilder<
    * @returns A new `WorkflowBuilder` generic extended with the new state ID.
    * @throws {Error} If a state with the same `id` is already registered.
    */
-  addState<S extends IState>(state: S): WorkflowBuilder<TActions, TStates | S['id']> {
+  addState<S extends AnyState>(state: S): WorkflowBuilder<TActions, TStates | S['id']> {
     this.stateRegistry.register(state);
     // Builder identity preserved; the TStates ID union grows.
     return this as unknown as WorkflowBuilder<TActions, TStates | S['id']>;
@@ -190,16 +190,14 @@ export class WorkflowBuilder<
     }
     for (const [id, state] of states) {
       if (state.kind === StateKind.Fork) {
-        const fork = state as import('../types/index.js').IForkState;
-        for (const target of fork.targets) {
+        for (const target of state.targets) {
           if (!states.has(target)) {
             throw new Error(`ForkState "${id}" references unregistered target "${target}"`);
           }
         }
       }
       if (state.kind === StateKind.Join) {
-        const join = state as import('../types/index.js').IJoinState;
-        for (const req of join.requires) {
+        for (const req of state.requires) {
           if (!states.has(req)) {
             throw new Error(`JoinState "${id}" requires unregistered state "${req}"`);
           }

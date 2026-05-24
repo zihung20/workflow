@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { StateCompletedGuard, StateActiveGuard } from '../../src/guards/state-guard.js';
-import { StateStatus } from '../../src/types/index.js';
-import { makeCtx } from '../helpers.js';
+import { StateCompletedGuard, StateActiveGuard } from './state-guard.js';
+import { makeCtx } from '../testing/helpers.js';
 
 describe('StateCompletedGuard', () => {
   it('passes when the target state is completed', async () => {

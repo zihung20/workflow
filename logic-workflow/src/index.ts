@@ -15,10 +15,12 @@ export { AlwaysGuard, NeverGuard, FnGuard } from './guards/index.js';
 export { StateKind, StateStatus } from './types/index.js';
 export type {
   IState,
+  IStepState,
   IForkState,
   IJoinState,
   ISubWorkflowState,
   JoinMode,
+  AnyState,
   IGuard,
   GuardFn,
   GuardContext,

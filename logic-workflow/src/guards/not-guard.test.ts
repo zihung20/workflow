@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { NotGuard } from '../../src/guards/not-guard.js';
-import { AlwaysGuard, NeverGuard } from '../../src/guards/primitives.js';
-import { makeCtx } from '../helpers.js';
+import { NotGuard } from './not-guard.js';
+import { AlwaysGuard, NeverGuard } from './primitives.js';
+import { makeCtx } from '../testing/helpers.js';
 
 describe('NotGuard', () => {
   it('inverts a passing guard to false', async () => {

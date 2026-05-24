@@ -1,5 +1,5 @@
 export { StateKind, StateStatus } from './state.js';
-export type { IState, IForkState, IJoinState, ISubWorkflowState, JoinMode } from './state.js';
+export type { IState, IStepState, IForkState, IJoinState, ISubWorkflowState, JoinMode, AnyState } from './state.js';
 
 export type { IGuard, GuardFn, GuardContext } from './guard.js';
 
