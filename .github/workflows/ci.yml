@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  library:
+    name: Library — typecheck / lint / test / build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: logic-workflow
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: logic-workflow/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: library-dist
+          path: logic-workflow/dist
+          retention-days: 1
+
+  web-runner:
+    name: Web Runner — build
+    runs-on: ubuntu-latest
+    needs: library
+    defaults:
+      run:
+        working-directory: web-runner
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download library dist
+        uses: actions/download-artifact@v4
+        with:
+          name: library-dist
+          path: logic-workflow/dist
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: web-runner/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
