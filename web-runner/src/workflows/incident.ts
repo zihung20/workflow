@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { WorkflowBuilder, StepState, Guard } from 'logic-workflow';
+import { WorkflowBuilder, Guard } from 'logic-workflow';
 import type { WorkflowInstance } from 'logic-workflow';
 
 const SeverityEnum = z.enum(['P1', 'P2', 'P3', 'P4']);
@@ -39,7 +39,18 @@ const CloseSchema = z.object({
   postMortemUrl: z.string().min(1),
 });
 
-export const incidentWorkflow = new WorkflowBuilder('it-incident-response')
+export const incidentWorkflow = new WorkflowBuilder({
+  name: 'it-incident-response',
+  states: [
+    'detected',
+    'triaged',
+    'investigating',
+    'contained',
+    'eradicated',
+    'recovered',
+    'closed',
+  ] as const,
+})
   .defineAction('DETECT',      DetectSchema)
   .defineAction('TRIAGE',      TriageSchema)
   .defineAction('INVESTIGATE', InvestigateSchema)
@@ -48,13 +59,13 @@ export const incidentWorkflow = new WorkflowBuilder('it-incident-response')
   .defineAction('RECOVER',     RecoverSchema)
   .defineAction('CLOSE',       CloseSchema)
 
-  .addState(new StepState('detected',     { label: 'Detected' }))
-  .addState(new StepState('triaged',      { label: 'Triaged' }))
-  .addState(new StepState('investigating',{ label: 'Investigating' }))
-  .addState(new StepState('contained',    { label: 'Contained' }))
-  .addState(new StepState('eradicated',   { label: 'Eradicated' }))
-  .addState(new StepState('recovered',    { label: 'Recovered' }))
-  .addState(new StepState('closed',       { label: 'Closed' }))
+  .addStep('detected',      { label: 'Detected' })
+  .addStep('triaged',       { label: 'Triaged' })
+  .addStep('investigating', { label: 'Investigating' })
+  .addStep('contained',     { label: 'Contained' })
+  .addStep('eradicated',    { label: 'Eradicated' })
+  .addStep('recovered',     { label: 'Recovered' })
+  .addStep('closed',        { label: 'Closed' })
 
   .setInitial('detected')
   .setTerminal(['closed'])

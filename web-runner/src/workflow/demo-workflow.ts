@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { WorkflowBuilder, StepState, Guard, StateStatus } from 'logic-workflow';
+import { WorkflowBuilder, Guard, StateStatus } from 'logic-workflow';
 import type { WorkflowInstance, InstanceSnapshot } from 'logic-workflow';
 
 // ─── Grid geometry ────────────────────────────────────────────────────────────
@@ -68,7 +68,18 @@ const RestorePowerSchema = z.object({
 //   neighbors-safe  — blocks CONFIRM_ISOLATION until no adjacent section is still energised
 //   neighbors-clear — blocks RESTORE_POWER while any adjacent section has live work
 
-export const ewcrWorkflow = new WorkflowBuilder('ewcr-section')
+export const ewcrWorkflow = new WorkflowBuilder({
+  name: 'ewcr-section',
+  states: [
+    'idle',
+    'isolation-requested',
+    'isolated',
+    'clearance-issued',
+    'work-in-progress',
+    'work-completed',
+    'power-restored',
+  ] as const,
+})
   .defineAction('REQUEST_ISOLATION', RequestIsolationSchema)
   .defineAction('CONFIRM_ISOLATION', ConfirmIsolationSchema)
   .defineAction('ISSUE_CLEARANCE',   IssueClearanceSchema)
@@ -76,13 +87,13 @@ export const ewcrWorkflow = new WorkflowBuilder('ewcr-section')
   .defineAction('COMPLETE_WORK',     CompleteWorkSchema)
   .defineAction('RESTORE_POWER',     RestorePowerSchema)
 
-  .addState(new StepState('idle',                { label: 'Energized' }))
-  .addState(new StepState('isolation-requested', { label: 'Isolation Requested' }))
-  .addState(new StepState('isolated',            { label: 'Isolated & Earthed' }))
-  .addState(new StepState('clearance-issued',    { label: 'Clearance Issued' }))
-  .addState(new StepState('work-in-progress',    { label: 'Work in Progress' }))
-  .addState(new StepState('work-completed',      { label: 'Work Completed' }))
-  .addState(new StepState('power-restored',      { label: 'Power Restored' }))
+  .addStep('idle',                { label: 'Energized' })
+  .addStep('isolation-requested', { label: 'Isolation Requested' })
+  .addStep('isolated',            { label: 'Isolated & Earthed' })
+  .addStep('clearance-issued',    { label: 'Clearance Issued' })
+  .addStep('work-in-progress',    { label: 'Work in Progress' })
+  .addStep('work-completed',      { label: 'Work Completed' })
+  .addStep('power-restored',      { label: 'Power Restored' })
 
   .setInitial('idle')
   .setTerminal(['power-restored'])

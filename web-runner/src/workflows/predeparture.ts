@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { WorkflowBuilder, StepState, ForkState, JoinState } from 'logic-workflow';
+import { WorkflowBuilder } from 'logic-workflow';
 import type { WorkflowInstance } from 'logic-workflow';
 
 const BriefingSchema = z.object({
@@ -23,7 +23,20 @@ const DepartSchema = z.object({
   scheduledAt: z.string().min(1),
 });
 
-export const predepartureWorkflow = new WorkflowBuilder('engineer-predeparture-checklist')
+export const predepartureWorkflow = new WorkflowBuilder({
+  name: 'engineer-predeparture-checklist',
+  states: [
+    'reported-for-duty',
+    'briefed',
+    'inspection-fork',
+    'mechanical',
+    'electrical',
+    'safety-systems',
+    'inspections-joined',
+    'signed-off',
+    'departed',
+  ] as const,
+})
   .defineAction('BRIEFING_RECEIVED', BriefingSchema)
   .defineAction('START_INSPECTION',  z.object({}))
   .defineAction('MECH_OK',           InspectionSchema)
@@ -32,15 +45,15 @@ export const predepartureWorkflow = new WorkflowBuilder('engineer-predeparture-c
   .defineAction('SIGN_OFF',          SignOffSchema)
   .defineAction('DEPART',            DepartSchema)
 
-  .addState(new StepState('reported-for-duty',  { label: 'Reported for Duty' }))
-  .addState(new StepState('briefed',            { label: 'Briefed' }))
-  .addState(new ForkState('inspection-fork',    { label: 'Inspection Fork', targets: ['mechanical', 'electrical', 'safety-systems'] }))
-  .addState(new StepState('mechanical',         { label: 'Mechanical Check' }))
-  .addState(new StepState('electrical',         { label: 'Electrical Check' }))
-  .addState(new StepState('safety-systems',     { label: 'Safety Systems Check' }))
-  .addState(new JoinState('inspections-joined', { label: 'Inspections Complete', requires: ['mechanical', 'electrical', 'safety-systems'], mode: 'all' }))
-  .addState(new StepState('signed-off',         { label: 'Signed Off' }))
-  .addState(new StepState('departed',           { label: 'Departed' }))
+  .addStep('reported-for-duty',  { label: 'Reported for Duty' })
+  .addStep('briefed',            { label: 'Briefed' })
+  .addFork('inspection-fork',    { label: 'Inspection Fork', targets: ['mechanical', 'electrical', 'safety-systems'] })
+  .addStep('mechanical',         { label: 'Mechanical Check' })
+  .addStep('electrical',         { label: 'Electrical Check' })
+  .addStep('safety-systems',     { label: 'Safety Systems Check' })
+  .addJoin('inspections-joined', { label: 'Inspections Complete', requires: ['mechanical', 'electrical', 'safety-systems'], mode: 'all' })
+  .addStep('signed-off',         { label: 'Signed Off' })
+  .addStep('departed',           { label: 'Departed' })
 
   .setInitial('reported-for-duty')
   .setTerminal(['departed'])
@@ -51,7 +64,7 @@ export const predepartureWorkflow = new WorkflowBuilder('engineer-predeparture-c
   .addTransition({ from: 'electrical',         to: 'inspections-joined', on: 'ELEC_OK' })
   .addTransition({ from: 'safety-systems',     to: 'inspections-joined', on: 'SAFETY_OK' })
   .addTransition({ from: 'inspections-joined', to: 'signed-off',         on: 'SIGN_OFF',
-    guard: (ctx) => ctx.payload.certifies === true })
+    guard: (ctx) => ctx.payload.certifies })
   .addTransition({ from: 'signed-off',         to: 'departed',           on: 'DEPART' })
 
   .build();

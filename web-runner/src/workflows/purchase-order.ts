@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { WorkflowBuilder, StepState } from 'logic-workflow';
+import { WorkflowBuilder } from 'logic-workflow';
 import type { WorkflowInstance } from 'logic-workflow';
 
 const SubmitSchema = z.object({
@@ -28,19 +28,29 @@ const FulfillSchema = z.object({
   deliveryDate: z.string().min(1),
 });
 
-export const purchaseOrderWorkflow = new WorkflowBuilder('purchase-order')
+export const purchaseOrderWorkflow = new WorkflowBuilder({
+  name: 'purchase-order',
+  states: [
+    'draft',
+    'submitted',
+    'under-review',
+    'approved',
+    'rejected',
+    'fulfilled',
+  ] as const,
+})
   .defineAction('SUBMIT',   SubmitSchema)
   .defineAction('REVIEW',   ReviewSchema)
   .defineAction('APPROVE',  ApproveSchema)
   .defineAction('REJECT',   RejectSchema)
   .defineAction('FULFILL',  FulfillSchema)
 
-  .addState(new StepState('draft',        { label: 'Draft' }))
-  .addState(new StepState('submitted',    { label: 'Submitted' }))
-  .addState(new StepState('under-review', { label: 'Under Review' }))
-  .addState(new StepState('approved',     { label: 'Approved' }))
-  .addState(new StepState('rejected',     { label: 'Rejected' }))
-  .addState(new StepState('fulfilled',    { label: 'Fulfilled' }))
+  .addStep('draft',        { label: 'Draft' })
+  .addStep('submitted',    { label: 'Submitted' })
+  .addStep('under-review', { label: 'Under Review' })
+  .addStep('approved',     { label: 'Approved' })
+  .addStep('rejected',     { label: 'Rejected' })
+  .addStep('fulfilled',    { label: 'Fulfilled' })
 
   .setInitial('draft')
   .setTerminal(['fulfilled', 'rejected'])
