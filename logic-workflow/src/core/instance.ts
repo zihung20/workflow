@@ -188,32 +188,31 @@ export class WorkflowInstance<TActions extends ActionPayloadMap> {
     return result;
   }
 
-  // ─── Sub-workflow resolution ───────────────────────────────────────────────
+  // ─── Wait resolution ──────────────────────────────────────────────────────
 
   /**
-   * Signals that an external sub-workflow has completed, promoting the
-   * corresponding `SubWorkflowState` from `waiting` to `active`.
+   * Signals that an external process has completed, promoting the corresponding
+   * `WaitState` from `waiting` to `active`.
    *
    * After calling this, dispatch the appropriate action to transition out of
-   * the sub-workflow state (e.g. `instance.dispatch('KYC_PASSED', {})`).
+   * the wait state (e.g. `instance.dispatch('KYC_PASSED', {})`).
    *
-   * @param stateId          - ID of the `SubWorkflowState` to resolve.
-   * @param externalSnapshot - Optional snapshot of the completed sub-workflow
-   *                           instance. Stored in the history entry for
-   *                           auditability.
-   * @throws {Error} If the state is not a `SubWorkflowState` or is not
-   *                 currently in `waiting` status.
+   * @param stateId          - ID of the `WaitState` to resolve.
+   * @param externalSnapshot - Optional snapshot of the completed external process.
+   *                           Stored in the history entry for auditability.
+   * @throws {Error} If the state is not a `WaitState` or is not currently
+   *                 in `waiting` status.
    */
-  resolveSubWorkflow(stateId: string, externalSnapshot?: InstanceSnapshot): void {
+  resolveWait(stateId: string, externalSnapshot?: InstanceSnapshot): void {
     const state = this.definition.states.get(stateId);
-    if (!state || state.kind !== StateKind.SubWorkflow) {
-      throw new Error(`State "${stateId}" is not a SubWorkflowState`);
+    if (!state || state.kind !== StateKind.Wait) {
+      throw new Error(`State "${stateId}" is not a WaitState`);
     }
 
     const current = this.snapshot.stateStatuses[stateId];
     if (current !== StateStatus.Waiting) {
       throw new Error(
-        `SubWorkflowState "${stateId}" is not waiting (current status: "${current ?? 'idle'}")`,
+        `WaitState "${stateId}" is not waiting (current status: "${current ?? 'idle'}")`,
       );
     }
 
@@ -223,7 +222,7 @@ export class WorkflowInstance<TActions extends ActionPayloadMap> {
     };
 
     const historyEntry = {
-      action: `__resolve_sub_workflow:${stateId}`,
+      action: `__resolve_wait:${stateId}`,
       payload: externalSnapshot ?? null,
       exitedStates: [] as string[],
       enteredStates: [stateId],

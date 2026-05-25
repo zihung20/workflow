@@ -8,7 +8,7 @@ import type { IState, StateKind } from '../types/index.js';
  *
  * The `TId` parameter preserves the string literal type of the constructor
  * argument so that the `WorkflowBuilder` factory methods (`addStep`, `addFork`,
- * `addJoin`, `addSubWorkflow`) can track registered IDs at compile time.
+ * `addJoin`, `addWait`) can track registered IDs at compile time.
  *
  * @template TId - The literal string type of this state's `id`. Defaults to
  *                 `string` for cases where the ID is not known at compile time.

@@ -12,4 +12,4 @@ Start here. You will build a complete purchase-order approval workflow from scra
 
 ## What comes next?
 
-Once you have completed the tutorial, the [How-To Guides](/how-to/) show you how to solve specific problems — parallel branches, external sub-workflows, snapshot persistence, and guard composition. The [Reference](/reference/) section is there when you need the exact API signature for a method.
+Once you have completed the tutorial, the [How-To Guides](/how-to/) show you how to solve specific problems — parallel branches, external wait states, snapshot persistence, and guard composition. The [Reference](/reference/) section is there when you need the exact API signature for a method.

@@ -30,7 +30,7 @@ export default defineConfig({
           items: [
             { text: 'Overview',                      link: '/how-to/'                },
             { text: 'Run steps in parallel',         link: '/how-to/parallel-branches' },
-            { text: 'Pause for an external process', link: '/how-to/sub-workflows'   },
+            { text: 'Pause for an external process', link: '/how-to/wait-state'      },
             { text: 'Control transitions with guards', link: '/how-to/guards'        },
             { text: 'Save and restore state',        link: '/how-to/persistence'     },
           ],

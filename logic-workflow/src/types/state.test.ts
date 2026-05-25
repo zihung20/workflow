@@ -6,7 +6,7 @@ describe('StateKind enum', () => {
     expect(StateKind.Step).toBe('step');
     expect(StateKind.Fork).toBe('fork');
     expect(StateKind.Join).toBe('join');
-    expect(StateKind.SubWorkflow).toBe('sub-workflow');
+    expect(StateKind.Wait).toBe('wait');
   });
 
   it('has four members', () => {

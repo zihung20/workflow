@@ -20,8 +20,8 @@ export interface JsonGraphNode {
   targets?: string[];
   /** JoinState prerequisite state IDs and mode (present when `kind === 'join'`). */
   join?: { requires: string[]; mode: string | number };
-  /** Name of the external workflow (present when `kind === 'sub-workflow'`). */
-  subWorkflowName?: string;
+  /** Name of the external process (present when `kind === 'wait'`). */
+  externalName?: string;
 }
 
 /**
@@ -88,8 +88,8 @@ export const JsonGraphExporter: IExporter<JsonGraph> = {
       if (state.kind === StateKind.Join) {
         node.join = { requires: [...state.requires], mode: state.mode };
       }
-      if (state.kind === StateKind.SubWorkflow) {
-        node.subWorkflowName = state.subWorkflowName;
+      if (state.kind === StateKind.Wait) {
+        node.externalName = state.externalName;
       }
 
       nodes.push(node);

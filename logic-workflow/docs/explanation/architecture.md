@@ -19,13 +19,13 @@ types/
 
 Pure TypeScript interfaces, enums, and discriminated unions. Contains zero logic and imports nothing from the rest of the codebase. Everything else derives its type contracts from this layer.
 
-Key exports: `IState`, `IForkState`, `IJoinState`, `ISubWorkflowState`, `IGuard`, `GuardContext`, `TransitionDefinition`, `InstanceSnapshot`, `DispatchResult`, `WorkflowDefinition`, `StateKind`, `StateStatus`, `JoinMode`.
+Key exports: `IState`, `IForkState`, `IJoinState`, `IWaitState`, `IGuard`, `GuardContext`, `TransitionDefinition`, `InstanceSnapshot`, `DispatchResult`, `WorkflowDefinition`, `StateKind`, `StateStatus`, `JoinMode`.
 
 ### `states/` and `guards/`
 
 Concrete implementations of `IState` and `IGuard`. Import only from `types/`. Neither layer is aware of the engine, the builder, or each other.
 
-- **`states/`** — `BaseState`, `StepState`, `ForkState`, `JoinState`, `SubWorkflowState`
+- **`states/`** — `BaseState`, `StepState`, `ForkState`, `JoinState`, `WaitState`
 - **`guards/`** — `FnGuard`, `InjectedGuard`, `AndGuard`, `OrGuard`, `NotGuard`, `StateCompletedGuard`, `StateActiveGuard`, `AlwaysGuard`, `NeverGuard`, `Guard` (factory namespace)
 
 ### `core/`
@@ -64,7 +64,7 @@ The rule is also a forcing function for interface design. If you find yourself w
 ```
 src/
 ├── types/
-│   ├── state.ts         ← StateKind, StateStatus, IState, IForkState, IJoinState, ISubWorkflowState, JoinMode
+│   ├── state.ts         ← StateKind, StateStatus, IState, IForkState, IJoinState, IWaitState, JoinMode
 │   ├── guard.ts         ← IGuard, GuardFn, GuardContext
 │   ├── transition.ts    ← TransitionDefinition
 │   ├── instance.ts      ← ReadonlyInstanceState, InstanceSnapshot, DispatchResult, HistoryEntry
@@ -75,7 +75,7 @@ src/
 │   ├── step-state.ts
 │   ├── fork-state.ts
 │   ├── join-state.ts
-│   └── sub-workflow-state.ts
+│   └── wait-state.ts
 │
 ├── guards/
 │   ├── primitives.ts    ← AlwaysGuard, NeverGuard, FnGuard

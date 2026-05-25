@@ -20,7 +20,7 @@ new WorkflowBuilder(config: { name: string; states: readonly [S, ...S[]] })
 
 **Throws** `Error` if `name` is empty or whitespace.
 
-Passing the full set of state IDs upfront establishes the `TStates` generic at instantiation time. Every subsequent call — `addStep`, `addFork`, `addJoin`, `addSubWorkflow`, `setInitial`, `setTerminal`, `addTransition` — is constrained to that union. IDEs autocomplete state IDs throughout the chain without any manual type annotations.
+Passing the full set of state IDs upfront establishes the `TStates` generic at instantiation time. Every subsequent call — `addStep`, `addFork`, `addJoin`, `addWait`, `setInitial`, `setTerminal`, `addTransition` — is constrained to that union. IDEs autocomplete state IDs throughout the chain without any manual type annotations.
 
 ```ts
 new WorkflowBuilder({
@@ -35,7 +35,7 @@ new WorkflowBuilder({
 The builder is a fluent chain. Methods must be called in this order:
 
 1. `defineAction()` — register each action and its payload schema
-2. `addStep()` / `addFork()` / `addJoin()` / `addSubWorkflow()` — register every state
+2. `addStep()` / `addFork()` / `addJoin()` / `addWait()` — register every state
 3. `setInitial()` / `setTerminal()` — declare entry and exit points
 4. `addTransition()` — wire states together
 5. `build()` — validate and compile
@@ -106,16 +106,16 @@ Creates and registers a `JoinState`. Both `id` and every entry in `requires` are
 **Throws** `Error` if `requires` is empty or if `id` is already registered.
 
 
-## `.addSubWorkflow(id, options)`
+## `.addWait(id, options)`
 
 ```ts
-addSubWorkflow(id: TStates, options: {
+addWait(id: TStates, options: {
   label?: string;
-  subWorkflowName: string;
+  externalName: string;
 }): this
 ```
 
-Creates and registers a `SubWorkflowState`. The `id` is constrained to `TStates`.
+Creates and registers a `WaitState`. The `id` is constrained to `TStates`.
 
 **Throws** `Error` if a state with the same `id` is already registered.
 

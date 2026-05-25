@@ -8,7 +8,7 @@
  *   Manager can authorise bus bridging; only the Control Supervisor can close)
  * - Parallel notification branches (Train Ops team + Station Masters + SMRT
  *   comms) that must ALL complete before the OCC can move to monitoring
- * - A sub-workflow that delegates the physical bus bridging coordination to a
+ * - A wait state that delegates the physical bus bridging coordination to a
  *   separate SOP and blocks until it confirms buses are in position
  * - Incident closure requiring a post-incident report
  *
@@ -30,7 +30,7 @@
  *                         notification-join ⑁ (all)
  *                                   │ START_BUS_BRIDGE  (guard: isDutyManager)
  *                                   ▼
- *                            bus-bridging ⤴  (SubWorkflow: bus-bridging-sop)
+ *                            bus-bridging ⤴  (WaitState: bus-bridging-sop)
  *                                   │ BUS_BRIDGE_ACTIVE
  *                                   ▼
  *                            service-disrupted
@@ -172,7 +172,7 @@ const occDisruptionSop = createWorkflow({
   .addStep('stn-masters',           { label: 'Station Masters Notified' })
   .addStep('public-comms',          { label: 'Public Comms Notified' })
   .addJoin('notification-join',     { label: 'All Parties Notified', requires: ['ops-team', 'stn-masters', 'public-comms'], mode: 'all' })
-  .addSubWorkflow('bus-bridging',   { label: 'Bus Bridging', subWorkflowName: 'bus-bridging-sop' })
+  .addWait('bus-bridging',          { label: 'Bus Bridging', externalName: 'bus-bridging-sop' })
   .addStep('service-disrupted',     { label: 'Disruption Active' })
   .addStep('service-restored',      { label: 'Service Restored' })
   .addStep('incident-closed',       { label: 'Incident Closed' })
@@ -290,27 +290,27 @@ async function runDisruptionSop() {
   });
   logStep('7. Join activated (all notified)', inst.getCurrentStates());
 
-  // ── Step 6: DM authorises bus bridging sub-workflow ─────────────────────────
+  // ── Step 6: DM authorises bus bridging wait state ────────────────────────────
   currentActor = dm;
   const bbRef = `BB-${Date.now()}`;
   await inst.dispatch('START_BUS_BRIDGE', {
     authorisedBy: { staffId: dm.staffId, role: dm.role },
     busBridgeRef: bbRef,
   });
-  logStep('8. Bus bridging sub-workflow started', inst.getCurrentStates());
+  logStep('8. Bus bridging wait state entered', inst.getCurrentStates());
   // State is now 'waiting' — the parent SOP is paused
 
   // ── Step 7: Bus-bridging SOP completes externally ───────────────────────────
   // In production: bus-bridging-sop runs in a separate WorkflowInstance.
-  // When it reaches terminal, the service calls resolveSubWorkflow().
+  // When it reaches terminal, the service calls resolveWait().
   console.log('\n  [external] Bus bridging SOP running...');
   console.log('  [external] Buses confirmed at JE, CS, BN ✓');
 
   const fakeExternalSnap = occDisruptionSop.createInstance(bbRef).getSnapshot();
-  inst.resolveSubWorkflow('bus-bridging', fakeExternalSnap);
-  logStep('9. Sub-workflow resolved', inst.getCurrentStates());
+  inst.resolveWait('bus-bridging', fakeExternalSnap);
+  logStep('9. Wait state resolved', inst.getCurrentStates());
 
-  // ── Step 8: Confirm buses are active; advance past SubWorkflow state ─────────
+  // ── Step 8: Confirm buses are active; advance past WaitState ─────────────────
   currentActor = ctrl;
   await inst.dispatch('BUS_BRIDGE_ACTIVE', {
     confirmedBy: { staffId: ctrl.staffId },

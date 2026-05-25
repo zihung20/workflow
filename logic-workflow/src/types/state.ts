@@ -5,10 +5,10 @@
  * activation until prerequisites are satisfied).
  */
 export enum StateKind {
-  Step        = 'step',
-  Fork        = 'fork',
-  Join        = 'join',
-  SubWorkflow = 'sub-workflow',
+  Step = 'step',
+  Fork = 'fork',
+  Join = 'join',
+  Wait = 'wait',
 }
 
 /**
@@ -16,7 +16,7 @@ export enum StateKind {
  *
  * - `idle`      — not yet reached in this run.
  * - `active`    — the current resting point; waiting for a dispatched action.
- * - `waiting`   — blocked on an external process (used by `SubWorkflowState`).
+ * - `waiting`   — blocked on an external process (used by `WaitState`).
  * - `completed` — permanently exited; cannot be re-entered.
  */
 export enum StateStatus {
@@ -74,18 +74,17 @@ export interface IJoinState extends IState {
 }
 
 /**
- * A `SubWorkflowState` blocks the parent workflow while an external,
- * independently-running `WorkflowInstance` is in progress.
+ * A `WaitState` blocks the parent workflow until an external signal arrives.
  *
  * The engine sets the state to `waiting` on entry. The service layer is
- * responsible for calling `instance.resolveSubWorkflow(stateId)` once the
- * external instance has completed, which transitions the state to `active`
- * so the parent workflow can resume via a normal `dispatch`.
+ * responsible for calling `instance.resolveWait(stateId)` once the external
+ * process has completed, which transitions the state to `active` so the
+ * parent workflow can resume via a normal `dispatch`.
  */
-export interface ISubWorkflowState extends IState {
-  readonly kind: StateKind.SubWorkflow;
-  /** Name of the external workflow definition this state delegates to. */
-  readonly subWorkflowName: string;
+export interface IWaitState extends IState {
+  readonly kind: StateKind.Wait;
+  /** Name of the external process this state is waiting for. Documentary only. */
+  readonly externalName: string;
 }
 
 /**
@@ -103,4 +102,4 @@ export interface IStepState extends IState {
  * so that the engine and visualization layer can narrow to a specific state
  * interface via a `kind` check without unsafe casts.
  */
-export type AnyState = IStepState | IForkState | IJoinState | ISubWorkflowState;
+export type AnyState = IStepState | IForkState | IJoinState | IWaitState;

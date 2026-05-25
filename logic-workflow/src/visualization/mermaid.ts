@@ -24,7 +24,7 @@ function kindSuffix(kind: StateKind): string {
   switch (kind) {
     case StateKind.Fork:        return ' ⑂';
     case StateKind.Join:        return ' ⑁';
-    case StateKind.SubWorkflow: return ' ⤴';
+    case StateKind.Wait: return ' ⤴';
     default:                    return '';
   }
 }
@@ -59,8 +59,8 @@ export const MermaidExporter: IExporter<string> = {
         if (state.kind === StateKind.Fork) {
           lines.push(`  [*] --> ${sid} : fork`);
         }
-      } else if (state.kind === StateKind.SubWorkflow) {
-        lines.push(`  state "${label} [${state.subWorkflowName}]" as ${sid}`);
+      } else if (state.kind === StateKind.Wait) {
+        lines.push(`  state "${label} [${state.externalName}]" as ${sid}`);
       } else {
         lines.push(`  ${sid} : ${label}`);
       }

@@ -67,7 +67,7 @@ The physical separation enforces the architectural rule at the toolchain level, 
 
 ## WorkflowBuilder: Config-First state declaration
 
-All state IDs are passed to the constructor as `states: [...] as const`. TypeScript infers the `TStates` union at the point of instantiation, so `addStep`, `addFork`, `addJoin`, `addSubWorkflow`, `setInitial`, `setTerminal`, and `addTransition` are all constrained to that fixed set of names for the entire chain.
+All state IDs are passed to the constructor as `states: [...] as const`. TypeScript infers the `TStates` union at the point of instantiation, so `addStep`, `addFork`, `addJoin`, `addWait`, `setInitial`, `setTerminal`, and `addTransition` are all constrained to that fixed set of names for the entire chain.
 
 `addFork` and `addJoin` go further: their `targets` and `requires` arrays are also typed as `TStates[]`, giving IDE autocomplete for prerequisite state names without any manual type annotations.
 

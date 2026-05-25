@@ -9,9 +9,9 @@ How-to guides are **task-oriented**. Each guide answers a specific question: "Ho
 
 Use `ForkState` to split execution into concurrent branches and `JoinState` to synchronise them back. Covers `mode: 'all'`, `'any'`, and quorum thresholds.
 
-### [Pause for an external process](./sub-workflows)
+### [Pause for an external process](./wait-state)
 
-Use `SubWorkflowState` to block a parent workflow until a separately-driven external process completes. Covers `resolveSubWorkflow` and the service-layer pattern.
+Use `WaitState` to block a parent workflow until an external process signals completion. Covers `resolveWait` and the service-layer pattern.
 
 ### [Control transitions with guards](./guards)
 

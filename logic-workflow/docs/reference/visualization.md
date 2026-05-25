@@ -35,7 +35,7 @@ const diagram = MermaidExporter.export(workflow.getDefinition(), inst.getSnapsho
 | `step` | _(none)_ |
 | `fork` | ` ⑂` |
 | `join` | ` ⑁` |
-| `sub-workflow` | ` ⤴` |
+| `wait` | ` ⤴` |
 
 ### Live status overlay
 
@@ -92,7 +92,7 @@ interface JsonGraph {
 ```ts
 interface JsonGraphNode {
   id:               string;
-  kind:             'step' | 'fork' | 'join' | 'sub-workflow';
+  kind:             'step' | 'fork' | 'join' | 'wait';
   label:            string;
   isInitial:        boolean;
   isTerminal:       boolean;
@@ -102,7 +102,7 @@ interface JsonGraphNode {
     requires: string[];
     mode:     string | number;
   };                               // JoinState only
-  subWorkflowName?: string;        // SubWorkflowState only
+  externalName?: string;           // WaitState only
 }
 ```
 

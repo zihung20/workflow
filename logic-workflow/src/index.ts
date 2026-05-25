@@ -11,7 +11,7 @@ export type {
   IStepState,
   IForkState,
   IJoinState,
-  ISubWorkflowState,
+  IWaitState,
   JoinMode,
   AnyState,
   IGuard,

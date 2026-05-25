@@ -119,21 +119,21 @@ getSnapshot(): InstanceSnapshot
 Returns a deep-cloned, JSON-serialisable snapshot of the current instance state. Safe to mutate — does not affect the instance.
 
 
-## `resolveSubWorkflow`
+## `resolveWait`
 
 ```ts
-resolveSubWorkflow(
+resolveWait(
   stateId: string,
   externalSnapshot?: InstanceSnapshot,
 ): void
 ```
 
-Promotes a `SubWorkflowState` from `waiting` → `active`. Call this from your service layer once the external workflow reaches a terminal state.
+Promotes a `WaitState` from `waiting` → `active`. Call this from your service layer once the external process completes.
 
 - Increments `snapshot.version`
-- Appends a `__resolve_sub_workflow:<stateId>` history entry
+- Appends a `__resolve_wait:<stateId>` history entry
 - Optionally stores `externalSnapshot` for audit
 
 **Throws** if:
-- `stateId` is not a `SubWorkflowState`
+- `stateId` is not a `WaitState`
 - The state is not currently `waiting`

@@ -20,7 +20,7 @@ This file is the authoritative reference for every agent and developer working i
 ```
 src/
 ├── types/
-│   ├── state.ts          — IStepState, IForkState, IJoinState, ISubWorkflowState, AnyState discriminated union
+│   ├── state.ts          — IStepState, IForkState, IJoinState, IWaitState, AnyState discriminated union
 │   ├── workflow.ts       — WorkflowDefinition, InstanceSnapshot, TransitionDefinition
 │   ├── guards.ts         — IGuard interface, GuardContext
 │   └── index.ts          — barrel re-export
@@ -30,7 +30,7 @@ src/
 │   ├── step-state.ts     — StepState implements IStepState
 │   ├── fork-state.ts     — ForkState<TId, TValidStates> — splits into parallel branches
 │   ├── join-state.ts     — JoinState<TId, TValidStates> — synchronises branches (all/any/quorum)
-│   └── sub-workflow-state.ts — SubWorkflowState — pauses until external process resolves
+│   └── wait-state.ts — WaitState — pauses until external process resolves
 
 ├── guards/
 │   ├── factory.ts        — Guard namespace: inject, stateCompleted, stateActive, and, or, not, fn, always, never
@@ -131,7 +131,7 @@ Treat a violation as a build error even when the compiler does not catch it.
 
 ### Config-First WorkflowBuilder
 
-All state IDs are declared upfront in the constructor. This establishes the `TStates` union at instantiation, so `addStep`, `addFork`, `addJoin`, `addSubWorkflow`, `setInitial`, `setTerminal`, and `addTransition` are all constrained to that fixed set — typos fail at compile time.
+All state IDs are declared upfront in the constructor. This establishes the `TStates` union at instantiation, so `addStep`, `addFork`, `addJoin`, `addWait`, `setInitial`, `setTerminal`, and `addTransition` are all constrained to that fixed set — typos fail at compile time.
 
 ```ts
 const wf = createWorkflow({
@@ -152,7 +152,7 @@ const wf = createWorkflow({
 **Rules:**
 - Use `createWorkflow()` — the `const` type parameter infers literal types automatically.
 - Never use `new WorkflowBuilder('name')` (old positional signature — removed) or `new WorkflowBuilder({...})` directly.
-- Every state must be registered via `addStep`, `addFork`, `addJoin`, or `addSubWorkflow`. There is no `addState` escape hatch.
+- Every state must be registered via `addStep`, `addFork`, `addJoin`, or `addWait`. There is no `addState` escape hatch.
 - `addFork` targets and `addJoin` requires autocomplete to the `TStates` union. A reference to an unregistered ID is both a compile-time error and a `build()` runtime error.
 - `defineAction` returns a new generic specialization (`WorkflowBuilder<TActions & Record<K, T>, TStates>`) because `TActions` must accumulate per call. The runtime object is unchanged; only the TypeScript type widens. All other methods return `this`.
 
@@ -160,7 +160,7 @@ const wf = createWorkflow({
 
 ### Discriminated union — no unsafe casts in the engine
 
-`AnyState = IStepState | IForkState | IJoinState | ISubWorkflowState` (in `src/types/state.ts`).
+`AnyState = IStepState | IForkState | IJoinState | IWaitState` (in `src/types/state.ts`).
 
 The `kind` property is a literal on each interface. Narrow with `state.kind === StateKind.Fork` — do not cast with `state as IForkState`. The six remaining `as` casts in the codebase are at storage-boundary sites and all have justifying comments.
 
@@ -250,7 +250,7 @@ pnpm test:e2e          # e2e only
 | Importing `visualization/` from `core/` | breaks layer separation |
 | Parallel `type`/`interface` alongside a Zod schema | duplicates source of truth |
 | `new WorkflowBuilder('name')` | old positional API — removed |
-| `addState()` | removed; use `addStep`/`addFork`/`addJoin`/`addSubWorkflow` |
+| `addState()` | removed; use `addStep`/`addFork`/`addJoin`/`addWait` |
 | `state as IForkState` without a kind guard | use discriminated union narrowing |
 | Non-null assertions without a justifying comment | hides null-safety assumptions |
 | Exported symbol without a TSDoc block | breaks the boundary documentation contract |
@@ -287,6 +287,14 @@ After every code change:
 - **v0.1.0**: TSDoc on all exports; `AnyState` discriminated union; Vitest workspace (unit/integration/e2e); 141 tests.
 - **v0.2.0**: VitePress `docs/` site (Diátaxis structure).
 - **v0.3.0**: `../web-runner/` React SPA — Vite + Tailwind + @xyflow/react; dagre layout; Zod-introspected dispatch forms.
-- **v0.4.0** *(breaking)*: Config-First WorkflowBuilder — states declared upfront; typed `addStep`/`addFork`/`addJoin`/`addSubWorkflow`; removed `addState()`.
+- **v0.4.0** *(breaking)*: Config-First WorkflowBuilder — states declared upfront; typed `addStep`/`addFork`/`addJoin`/`addWait`; removed `addState()`.
 - **v0.5.0**: Trimmed public barrel — concrete state/guard classes removed; all guard composition via `Guard` namespace.
 - **v0.6.0–v0.7.0** *(breaking)*: `createWorkflow()` factory replaces `new WorkflowBuilder({ states: [...] as const })`; dynamic-workflow integration tests (19 tests); lint fixed across 11 files. 162 tests pass.
+
+### [v0.8.0] 2026-05-25 — Rename SubWorkflowState → WaitState *(breaking)*
+
+- `SubWorkflowState` → `WaitState`; `ISubWorkflowState` → `IWaitState`; `StateKind.SubWorkflow = 'sub-workflow'` → `StateKind.Wait = 'wait'`.
+- `addSubWorkflow(id, { subWorkflowName })` → `addWait(id, { externalName })` on `WorkflowBuilder`.
+- `instance.resolveSubWorkflow()` → `instance.resolveWait()`; history action key `__resolve_sub_workflow:` → `__resolve_wait:`.
+- File renames: `sub-workflow-state.ts` → `wait-state.ts`, `sub-workflow.test.ts` → `wait.test.ts`, `sub-workflows.md` → `wait-state.md`.
+- All docs, tests, examples, and web-runner updated. 162 tests pass; all four pipeline steps clean.

@@ -27,8 +27,8 @@ features:
     details: ForkState fans out to concurrent steps; JoinState synchronises them with "all", "any", or a quorum threshold — resolved in a single engine tick.
 
   - icon: ⏸️
-    title: External sub-workflows
-    details: SubWorkflowState pauses the parent workflow until your service layer signals completion. The engine has no I/O coupling whatsoever.
+    title: External wait states
+    details: WaitState pauses the parent workflow until your service layer signals completion. The engine has no I/O coupling whatsoever.
 
   - icon: 💾
     title: Purely functional persistence

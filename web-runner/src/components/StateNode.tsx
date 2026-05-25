@@ -21,7 +21,7 @@ const STATUS_BG: Record<string, string> = {
 const KIND_ICON: Record<string, string> = {
   fork:           '⑂',
   join:           '⑁',
-  'sub-workflow': '⤴',
+  wait: '⤴',
 };
 
 export function StateNode({ data }: NodeProps<StateNodeType>) {

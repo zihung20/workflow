@@ -16,12 +16,12 @@ function makeLinear() {
     .build();
 }
 
-function makeSubWorkflow() {
-  return createWorkflow({ name: 'sub-wf', states: ['start', 'sub', 'end'] })
+function makeWait() {
+  return createWorkflow({ name: 'wait-wf', states: ['start', 'sub', 'end'] })
     .defineAction('START', Empty)
     .defineAction('DONE', Empty)
     .addStep('start')
-    .addSubWorkflow('sub', { subWorkflowName: 'external' })
+    .addWait('sub', { externalName: 'external' })
     .addStep('end')
     .setInitial('start')
     .setTerminal(['end'])
@@ -114,34 +114,34 @@ describe('WorkflowInstance — getStateStatus', () => {
   });
 });
 
-describe('WorkflowInstance — resolveSubWorkflow', () => {
-  it('transitions a waiting SubWorkflowState to active', async () => {
-    const wf = makeSubWorkflow();
+describe('WorkflowInstance — resolveWait', () => {
+  it('transitions a waiting WaitState to active', async () => {
+    const wf = makeWait();
     const inst = wf.createInstance('sw-001');
     await inst.dispatch('START', {});
     expect(inst.getStateStatus('sub')).toBe(StateStatus.Waiting);
-    inst.resolveSubWorkflow('sub');
+    inst.resolveWait('sub');
     expect(inst.getStateStatus('sub')).toBe(StateStatus.Active);
   });
 
-  it('throws when stateId is not a SubWorkflowState', () => {
-    const wf = makeSubWorkflow();
+  it('throws when stateId is not a WaitState', () => {
+    const wf = makeWait();
     const inst = wf.createInstance('sw-002');
-    expect(() => inst.resolveSubWorkflow('start')).toThrow('SubWorkflowState');
+    expect(() => inst.resolveWait('start')).toThrow('WaitState');
   });
 
-  it('throws when the SubWorkflowState is not in waiting status', () => {
-    const wf = makeSubWorkflow();
+  it('throws when the WaitState is not in waiting status', () => {
+    const wf = makeWait();
     const inst = wf.createInstance('sw-003');
     // 'sub' is still idle (START not dispatched yet)
-    expect(() => inst.resolveSubWorkflow('sub')).toThrow('not waiting');
+    expect(() => inst.resolveWait('sub')).toThrow('not waiting');
   });
 
   it('increments version and appends history on resolve', async () => {
-    const wf = makeSubWorkflow();
+    const wf = makeWait();
     const inst = wf.createInstance('sw-004');
     await inst.dispatch('START', {});
-    inst.resolveSubWorkflow('sub');
+    inst.resolveWait('sub');
     expect(inst.getSnapshot().version).toBe(2);
     expect(inst.getSnapshot().history).toHaveLength(2);
   });

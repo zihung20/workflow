@@ -8,7 +8,7 @@ import { FnGuard } from '../guards/index.js';
 import { StepState } from '../states/step-state.js';
 import { ForkState } from '../states/fork-state.js';
 import { JoinState } from '../states/join-state.js';
-import { SubWorkflowState } from '../states/sub-workflow-state.js';
+import { WaitState } from '../states/wait-state.js';
 
 /**
  * Fluent builder for composing and validating a workflow definition.
@@ -33,7 +33,7 @@ import { SubWorkflowState } from '../states/sub-workflow-state.js';
  *
  * 1. Constructor — declare the name and all state IDs.
  * 2. `defineAction()` — register each action and its Zod payload schema.
- * 3. `addStep()` / `addFork()` / `addJoin()` / `addSubWorkflow()` — register states.
+ * 3. `addStep()` / `addFork()` / `addJoin()` / `addWait()` — register states.
  * 4. `setInitial()` / `setTerminal()` — declare entry and exit points.
  * 5. `addTransition()` — wire states together with named, optionally-guarded arcs.
  * 6. `build()` — validate and compile into an immutable `Workflow`.
@@ -153,17 +153,17 @@ export class WorkflowBuilder<
   }
 
   /**
-   * Creates and registers a `SubWorkflowState` that blocks the parent workflow
-   * while an external `WorkflowInstance` is in progress.
+   * Creates and registers a `WaitState` that pauses the parent workflow until
+   * an external signal arrives via `instance.resolveWait(stateId)`.
    *
    * @param id      - Must be one of the state IDs declared in the constructor.
-   * @param options - `subWorkflowName`: name of the external workflow definition.
-   *                  `label`:           optional display label.
+   * @param options - `externalName`: name of the external process being waited on.
+   *                  `label`:        optional display label.
    * @returns `this` for chaining.
    * @throws {Error} If a state with the same `id` is already registered.
    */
-  addSubWorkflow(id: TStates, options: { label?: string; subWorkflowName: string }): this {
-    this.stateRegistry.register(new SubWorkflowState(id, options));
+  addWait(id: TStates, options: { label?: string; externalName: string }): this {
+    this.stateRegistry.register(new WaitState(id, options));
     return this;
   }
 

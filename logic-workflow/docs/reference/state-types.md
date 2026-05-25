@@ -3,7 +3,7 @@
 States are the nodes of the workflow graph. Each state has a unique `id`, a `kind` that controls engine behaviour on entry, and a `label` used in visualization.
 
 ```ts
-import { StepState, ForkState, JoinState, SubWorkflowState } from 'logic-workflow';
+import { StepState, ForkState, JoinState, WaitState } from 'logic-workflow';
 ```
 
 
@@ -15,7 +15,7 @@ Every state moves through a fixed set of statuses as the workflow progresses:
 |--------|---------|
 | `idle` | Not yet entered |
 | `active` | Currently active — awaiting a dispatch |
-| `waiting` | `SubWorkflowState` only — paused until `resolveSubWorkflow` is called |
+| `waiting` | `WaitState` only — paused until `resolveWait` is called |
 | `completed` | Exited; will not become active again |
 
 
@@ -100,27 +100,27 @@ new JoinState('reviews-complete', {
 ```
 
 
-## SubWorkflowState
+## WaitState
 
-Pauses the parent workflow at `waiting` status until the service layer calls `resolveSubWorkflow`. The engine has no I/O coupling — orchestration is entirely the service layer's responsibility.
+Pauses the parent workflow at `waiting` status until the service layer calls `resolveWait`. The engine has no I/O coupling — orchestration is entirely the service layer's responsibility.
 
 ```ts
-new SubWorkflowState(id: string, options: {
-  label?:           string;
-  subWorkflowName:  string;
+new WaitState(id: string, options: {
+  label?:       string;
+  externalName: string;
 })
 ```
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `id` | `string` | yes | Unique identifier in the parent workflow. |
-| `options.subWorkflowName` | `string` | yes | Name of the external workflow. Used for documentation and visualization; the engine never resolves it. |
+| `options.externalName` | `string` | yes | Name of the external process. Used for documentation and visualization; the engine never resolves it. |
 | `options.label` | `string` | no | Visualization label. |
 
 ```ts
-new SubWorkflowState('vendor-kyc', {
-  subWorkflowName: 'kyc-workflow',
+new WaitState('vendor-kyc', {
+  externalName: 'kyc-workflow',
 })
 ```
 
-See [Pause for an external process](/how-to/sub-workflows) for the full service-layer pattern.
+See [Pause for an external process](/how-to/wait-state) for the full service-layer pattern.

@@ -185,7 +185,7 @@ export class WorkflowEngine {
    * - `StepState` → `active`
    * - `ForkState` → `completed` (transient), then recursively enters all targets
    * - `JoinState` → deferred; handled by the fixed-point join-check loop
-   * - `SubWorkflowState` → `waiting`
+   * - `WaitState` → `waiting`
    */
   private static enterState(
     stateId: string,
@@ -216,7 +216,7 @@ export class WorkflowEngine {
         // no status change is applied here.
         break;
 
-      case StateKind.SubWorkflow:
+      case StateKind.Wait:
         statuses.set(stateId, StateStatus.Waiting);
         entered.push(stateId);
         break;

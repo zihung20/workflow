@@ -8,7 +8,7 @@
  *  - snapshot JSON round-trip fidelity
  *  - terminal-state rejection
  *  - available-transitions accuracy
- *  - SubWorkflow full lifecycle
+ *  - WaitState full lifecycle
  */
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
@@ -58,7 +58,7 @@ const subWf = createWorkflow({ name: 'sub-wf', states: ['begin', 'external', 'do
   .defineAction('ENTER', Empty)
   .defineAction('COMPLETE', Empty)
   .addStep('begin')
-  .addSubWorkflow('external', { subWorkflowName: 'child-process' })
+  .addWait('external', { externalName: 'child-process' })
   .addStep('done')
   .setInitial('begin')
   .setTerminal(['done'])
@@ -90,11 +90,11 @@ describe('Invariant: version counter', () => {
     expect(inst.getSnapshot().version).toBe(vBefore);
   });
 
-  it('resolveSubWorkflow also increments version', async () => {
+  it('resolveWait also increments version', async () => {
     const inst = subWf.createInstance('v-004');
     await inst.dispatch('ENTER', {});
     const vBefore = inst.getSnapshot().version;
-    inst.resolveSubWorkflow('external');
+    inst.resolveWait('external');
     expect(inst.getSnapshot().version).toBe(vBefore + 1);
   });
 });
@@ -230,10 +230,10 @@ describe('Invariant: getAvailableTransitions', () => {
   });
 });
 
-// ─── SubWorkflow full lifecycle ───────────────────────────────────────────────
+// ─── WaitState full lifecycle ─────────────────────────────────────────────────
 
-describe('Invariant: SubWorkflow full lifecycle', () => {
-  it('sets SubWorkflowState to waiting on entry', async () => {
+describe('Invariant: WaitState full lifecycle', () => {
+  it('sets WaitState to waiting on entry', async () => {
     const inst = subWf.createInstance('sw-001');
     await inst.dispatch('ENTER', {});
     expect(inst.getStateStatus('external')).toBe(StateStatus.Waiting);
@@ -247,17 +247,17 @@ describe('Invariant: SubWorkflow full lifecycle', () => {
     if (!result.success) expect(result.reason).toBe('no-active-source');
   });
 
-  it('resolveSubWorkflow promotes waiting → active', async () => {
+  it('resolveWait promotes waiting → active', async () => {
     const inst = subWf.createInstance('sw-003');
     await inst.dispatch('ENTER', {});
-    inst.resolveSubWorkflow('external');
+    inst.resolveWait('external');
     expect(inst.getStateStatus('external')).toBe(StateStatus.Active);
   });
 
-  it('can dispatch out after resolveSubWorkflow', async () => {
+  it('can dispatch out after resolveWait', async () => {
     const inst = subWf.createInstance('sw-004');
     await inst.dispatch('ENTER', {});
-    inst.resolveSubWorkflow('external');
+    inst.resolveWait('external');
     const result = await inst.dispatch('COMPLETE', {});
     expect(result.success).toBe(true);
     expect(inst.isTerminal()).toBe(true);
@@ -267,9 +267,9 @@ describe('Invariant: SubWorkflow full lifecycle', () => {
     const externalSnap = subWf.createInstance('child').getSnapshot();
     const inst = subWf.createInstance('sw-005');
     await inst.dispatch('ENTER', {});
-    inst.resolveSubWorkflow('external', externalSnap);
+    inst.resolveWait('external', externalSnap);
     const resolveEntry = inst.getSnapshot().history.find(
-      (e) => e.action.startsWith('__resolve_sub_workflow'),
+      (e) => e.action.startsWith('__resolve_wait'),
     );
     expect(resolveEntry?.payload).toMatchObject({ instanceId: 'child' });
   });

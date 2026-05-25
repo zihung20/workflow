@@ -164,5 +164,5 @@ restored.injectGuard('isManager', myGuardFn);
 ## Next steps
 
 - [Run steps in parallel](/how-to/parallel-branches) — use `ForkState` and `JoinState`
-- [Pause for an external process](/how-to/sub-workflows) — delegate to a child workflow
+- [Pause for an external process](/how-to/wait-state) — pause until an external signal arrives
 - [Guard composition](/how-to/guards) — `Guard.and`, `Guard.or`, `Guard.not`

@@ -9,7 +9,7 @@
 interface InstanceSnapshot {
   instanceId:    string;
   workflowName:  string;
-  version:       number;             // increments on every successful dispatch or resolveSubWorkflow
+  version:       number;             // increments on every successful dispatch or resolveWait
   stateStatuses: Readonly<Record<string, StateStatus>>;
   isTerminal:    boolean;
   history:       readonly HistoryEntry[];
@@ -91,7 +91,7 @@ interface HistoryEntry {
 }
 ```
 
-`resolveSubWorkflow` adds an entry with the synthetic action name `__resolve_sub_workflow:<stateId>`. You can query the history array directly to produce an audit trail.
+`resolveWait` adds an entry with the synthetic action name `__resolve_wait:<stateId>`. You can query the history array directly to produce an audit trail.
 
 
 ## Crash recovery
