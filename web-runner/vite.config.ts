@@ -5,6 +5,6 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   optimizeDeps: {
-    include: ['logic-workflow', 'logic-workflow/visualization'],
+    include: ['flowyd', 'flowyd/visualization'],
   },
 });

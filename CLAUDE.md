@@ -6,7 +6,7 @@ This file is the authoritative reference for every agent and developer working i
 
 ## 1. System Overview
 
-`logic-workflow` is a TypeScript library for building typed, auditable workflow state machines. It exposes a fluent `WorkflowBuilder` API that enforces state-ID correctness at compile time, a pure stateless `WorkflowEngine` that executes transitions, and pluggable guard functions for async business-rule evaluation. Snapshots are plain JSON — the library has no opinion on storage.
+`flowyd` is a TypeScript library for building typed, auditable workflow state machines. It exposes a fluent `WorkflowBuilder` API that enforces state-ID correctness at compile time, a pure stateless `WorkflowEngine` that executes transitions, and pluggable guard functions for async business-rule evaluation. Snapshots are plain JSON — the library has no opinion on storage.
 
 **Companion apps (not in this directory):**
 
@@ -215,7 +215,7 @@ Private/internal methods only need TSDoc when their purpose is genuinely non-obv
 
 ### Visualization is a separate entry point
 
-`MermaidExporter` and `JsonGraphExporter` live in `src/visualization/` and are exported from `"logic-workflow/visualization"`. Bundlers can tree-shake this from applications that don't use it. `core/` has zero knowledge that visualization exists.
+`MermaidExporter` and `JsonGraphExporter` live in `src/visualization/` and are exported from `"flowyd/visualization"`. Bundlers can tree-shake this from applications that don't use it. `core/` has zero knowledge that visualization exists.
 
 ---
 
@@ -334,7 +334,7 @@ After every code change:
 ### [v0.11.0] 2026-05-27 — Documentation restructure: user guide + developer guide
 
 - Replaced Diátaxis `tutorials/` / `how-to/` / `reference/` / `explanation/` structure with two top-level sections: **User Guide** (`/guide/`, `/examples/`, `/scenarios/`, `/api/`) and **Developer Guide** (`/dev/`).
-- Added `logic-workflow/README.md` with project introduction, compile-time type-safety showcase (three annotated error examples), quick-start snippet, and links to full docs.
+- Added `flowyd/README.md` with project introduction, compile-time type-safety showcase (three annotated error examples), quick-start snippet, and links to full docs.
 - New `/guide/` section: introduction with strict-typing selling point, core-concepts page (all four state types with diagrams), installation page.
 - New `/examples/` section: four complete copy-pasteable workflows — Purchase Order Approval, Engineer Pre-Departure Checklist (from `examples/engineer-predeparture-checklist.ts`), OCC Disruption SOP (from `examples/occ-disruption-sop.ts`), Station Opening Checklist (from `examples/station-opening-checklist.ts`).
 - New `/scenarios/` section: five task-based guides (sequential flow, parallel branches, external wait, guards, persistence) — migrated and tightened from old how-to pages.

@@ -10,13 +10,18 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 jobs:
   library:
     name: Library — typecheck / lint / test / build
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: logic-workflow
+        working-directory: flowyd
 
     steps:
       - uses: actions/checkout@v4
@@ -27,9 +32,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: pnpm
-          cache-dependency-path: logic-workflow/pnpm-lock.yaml
+          cache-dependency-path: flowyd/pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -46,29 +51,21 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Upload dist
-        uses: actions/upload-artifact@v4
-        with:
-          name: library-dist
-          path: logic-workflow/dist
-          retention-days: 1
 
-  web-runner:
-    name: Web Runner — build
+  deploy-docs:
+    name: Docs — build & deploy to GitHub Pages
     runs-on: ubuntu-latest
     needs: library
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     defaults:
       run:
-        working-directory: web-runner
+        working-directory: flowyd
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Download library dist
-        uses: actions/download-artifact@v4
-        with:
-          name: library-dist
-          path: logic-workflow/dist
 
       - uses: pnpm/action-setup@v4
         with:
@@ -76,12 +73,20 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: pnpm
-          cache-dependency-path: web-runner/pnpm-lock.yaml
+          cache-dependency-path: flowyd/pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build
-        run: pnpm build
+      - name: Build docs
+        run: pnpm docs:build
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: flowyd/docs/.vitepress/dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

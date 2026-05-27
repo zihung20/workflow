@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { createWorkflow, Guard, StateStatus } from 'logic-workflow';
-import type { WorkflowInstance, InstanceSnapshot } from 'logic-workflow';
+import { createWorkflow, Guard, StateStatus } from 'flowyd';
+import type { WorkflowInstance, InstanceSnapshot } from 'flowyd';
 
 // ─── Grid geometry ────────────────────────────────────────────────────────────
 

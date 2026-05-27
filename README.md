@@ -1,4 +1,4 @@
-# logic-workflow
+# flowyd
 
 Strongly-typed SOP state machines for TypeScript.
 
@@ -6,17 +6,17 @@ This repository contains two packages that work together:
 
 ---
 
-## `logic-workflow/` — the core library
+## `flowyd/` — the core library
 
 A TypeScript library for building typed, auditable workflow state machines. Install it in your project to define and execute workflows in code.
 
 ```sh
-pnpm add logic-workflow zod
+pnpm add flowyd zod
 ```
 
 The compiler catches every typo in a state ID, every wrong action name, and every mismatched payload shape before your code runs.
 
-- [Library README](./logic-workflow/README.md) — install, quick start, API overview
+- [Library README](./flowyd/README.md) — install, quick start, API overview
 - [Full documentation](https://your-docs-site.com/guide/)
 
 ---
@@ -27,7 +27,7 @@ A React SPA (Vite + Tailwind + React Flow) that visualises and drives workflows 
 
 ```sh
 # Build the library first
-cd logic-workflow && pnpm build
+cd flowyd && pnpm build
 
 # Start the web runner
 cd ../web-runner && pnpm dev   # → http://localhost:5173
@@ -39,8 +39,8 @@ cd ../web-runner && pnpm dev   # → http://localhost:5173
 
 ```sh
 # Install and build everything
-cd logic-workflow && pnpm install && pnpm build
+cd flowyd && pnpm install && pnpm build
 cd ../web-runner  && pnpm install
 ```
 
-See [Contributing](./logic-workflow/docs/dev/contributing.md) for the full development guide.
+See [Contributing](./flowyd/docs/dev/contributing.md) for the full development guide.

@@ -31,7 +31,10 @@
       "Bash(pnpm format *)",
       "Bash(pnpm lint:fix *)",
       "Bash(pnpm docs:build)",
-      "Bash(grep -rn \"^---$\" /Users/zihung20/Desktop/workflow/logic-workflow/docs --include=\"*.md\")"
+      "Bash(grep -rn \"^---$\" /Users/zihung20/Desktop/workflow/logic-workflow/docs --include=\"*.md\")",
+      "Bash(sed -i '' 's|logic-workflow|flowyd|g' /Users/zihung20/Desktop/workflow/.github/workflows/ci.yml)",
+      "Bash(sed -i '' 's|logic-workflow|flowyd|g' /Users/zihung20/Desktop/workflow/README.md)",
+      "Bash(sed -i '' 's|logic-workflow|flowyd|g' /Users/zihung20/Desktop/workflow/CLAUDE.md)"
     ]
   }
 }

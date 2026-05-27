@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { createWorkflow } from 'logic-workflow';
-import type { WorkflowInstance } from 'logic-workflow';
+import { createWorkflow } from 'flowyd';
+import type { WorkflowInstance } from 'flowyd';
 
 const BriefingSchema = z.object({
   trainId:   z.string().min(1),

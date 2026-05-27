@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { createWorkflow, Guard } from 'logic-workflow';
-import type { WorkflowInstance } from 'logic-workflow';
+import { createWorkflow, Guard } from 'flowyd';
+import type { WorkflowInstance } from 'flowyd';
 
 const SeverityEnum = z.enum(['P1', 'P2', 'P3', 'P4']);
 
