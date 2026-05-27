@@ -14,10 +14,7 @@ s1 ──ACTION_A──▶ s2 ──ACTION_B──▶ s3 ✓
 import { z } from 'zod';
 import { createWorkflow } from 'flowyd';
 
-const linear = createWorkflow({
-  name: 'my-workflow',
-  states: ['s1', 's2', 's3'],
-})
+const linear = createWorkflow({ name: 'my-workflow' })
   .defineAction('ACTION_A', z.object({ actorId: z.string() }))
   .defineAction('ACTION_B', z.object({ actorId: z.string() }))
 
@@ -46,7 +43,7 @@ console.log(inst.isTerminal());       // true
 ## Rules
 
 - **Call order matters.** The fluent chain must follow: `defineAction` → `addStep/addFork/addJoin/addWait` → `setInitial/setTerminal` → `addTransition` → `build`.
-- **Every declared state must be registered.** Each ID in `states` must appear in exactly one `addStep`, `addFork`, `addJoin`, or `addWait` call. `build()` throws if any are missing.
+- **Every used state must be registered.** Each ID referenced in `setInitial`, `setTerminal`, or `addTransition` must have been registered via `addStep`, `addFork`, `addJoin`, or `addWait` before `build()` is called.
 - **At least one terminal state is required.** A workflow with no terminal state throws at `build()`.
 - **Dispatch on a terminal instance always returns `{ success: false, reason: 'terminal-state' }`.**
 
@@ -55,10 +52,7 @@ console.log(inst.isTerminal());       // true
 A state can have transitions for different actions, enabling branching:
 
 ```ts
-const approval = createWorkflow({
-  name: 'approval',
-  states: ['draft', 'approved', 'rejected'],
-})
+const approval = createWorkflow({ name: 'approval' })
   .defineAction('APPROVE', z.object({}))
   .defineAction('REJECT', z.object({ reason: z.string() }))
 

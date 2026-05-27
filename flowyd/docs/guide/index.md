@@ -13,17 +13,18 @@ Most workflow libraries let you write strings wherever you please. A typo in a s
 
 `flowyd` catches all of these at compile time.
 
-### State IDs are locked at declaration
+### State IDs accumulate as you register them
 
-All state IDs are declared upfront in `createWorkflow`. TypeScript infers the union from that array. Every subsequent call — `addStep`, `addFork`, `addJoin`, `addWait`, `setInitial`, `setTerminal`, `addTransition` — is constrained to exactly that set.
+Each `addStep`, `addFork`, `addJoin`, or `addWait` call widens the `TStates` union by one literal. Every subsequent call — `setInitial`, `setTerminal`, `addTransition`, `addFork.targets`, `addJoin.requires` — is constrained to exactly that accumulated set.
 
 ```ts
-const wf = createWorkflow({
-  name: 'approval',
-  states: ['draft', 'review', 'approved', 'rejected'],
-})
-  .addStep('approveddd'); // TS2345: Argument of type '"approveddd"' is not assignable
-                          // to parameter of type '"draft" | "review" | "approved" | "rejected"'
+const wf = createWorkflow({ name: 'approval' })
+  .addStep('draft')
+  .addStep('review')
+  .addStep('approved')
+  .addStep('rejected')
+  .setInitial('drft'); // TS2345: Argument of type '"drft"' is not assignable
+                       // to parameter of type '"draft" | "review" | "approved" | "rejected"'
 ```
 
 IDEs autocomplete state IDs throughout the entire chain. No typos make it to runtime.
@@ -33,7 +34,7 @@ IDEs autocomplete state IDs throughout the entire chain. No typos make it to run
 `defineAction` registers each action and binds a Zod schema to its payload. The `TActions` generic accumulates across calls, so `dispatch` only accepts action names you defined.
 
 ```ts
-const wf = createWorkflow({ name: 'approval', states: ['draft', 'approved'] })
+const wf = createWorkflow({ name: 'approval' })
   .defineAction('SUBMIT', z.object({ submitterId: z.string() }))
   .defineAction('APPROVE', z.object({ approverId: z.string() }))
   // ...
@@ -60,14 +61,18 @@ await inst.dispatch('APPROVE', { approver: 'x' });
 
 ### Fork targets and join requires are autocompleted
 
-`addFork` and `addJoin` constrain their `targets` and `requires` arrays to the declared state union:
+`addFork` and `addJoin` constrain their `targets` and `requires` arrays to states already accumulated in `TStates`. Register branch states before the fork that targets them:
 
 ```ts
-createWorkflow({ name: 'proc', states: ['start', 'fork', 'a', 'b', 'join', 'end'] })
-  .addFork('fork', { targets: ['a', 'b'] })      // autocompletes to the 6 declared IDs
+createWorkflow({ name: 'proc' })
+  .addStep('start')
+  .addStep('a')
+  .addStep('b')
+  .addFork('fork', { targets: ['a', 'b'] })      // autocompletes to accumulated TStates
   .addJoin('join', { requires: ['a', 'b'], mode: 'all' })  // same
-  .addFork('fork', { targets: ['a', 'missspelled'] })
-  //                                ^^^^^^^^^^^^ compile error
+  // But a typo at the point of registration:
+  .addFork('fork2', { targets: ['a', 'missspelled'] })
+  //                                ^^^^^^^^^^^^ compile error — 'missspelled' not in TStates
 ```
 
 

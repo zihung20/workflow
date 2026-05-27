@@ -69,17 +69,6 @@ const DepartSchema = z.object({
 
 const engineerChecklist = createWorkflow({
   name: 'engineer-predeparture-checklist',
-  states: [
-    'reported-for-duty',
-    'briefed',
-    'inspection-fork',
-    'mechanical',
-    'electrical',
-    'safety-systems',
-    'inspections-joined',
-    'signed-off',
-    'departed',
-  ],
 })
   // ── Actions ──────────────────────────────────────────────────────────────
   .defineAction('BRIEFING_RECEIVED', BriefingSchema)
@@ -94,15 +83,15 @@ const engineerChecklist = createWorkflow({
   .addStep('reported-for-duty', { label: 'Reported for Duty' })
   .addStep('briefed', { label: 'Briefed' })
 
-  // targets: autocompletes to the declared state union
+  // branches registered first so fork targets are in TStates at call time
+  .addStep('mechanical', { label: 'Mechanical Check' })
+  .addStep('electrical', { label: 'Electrical Check' })
+  .addStep('safety-systems', { label: 'Safety Systems Check' })
+
   .addFork('inspection-fork', {
     label: 'Inspection Fork',
     targets: ['mechanical', 'electrical', 'safety-systems'],
   })
-
-  .addStep('mechanical', { label: 'Mechanical Check' })
-  .addStep('electrical', { label: 'Electrical Check' })
-  .addStep('safety-systems', { label: 'Safety Systems Check' })
 
   // requires: autocompletes to the declared state union
   .addJoin('inspections-joined', {

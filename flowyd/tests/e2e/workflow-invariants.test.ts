@@ -19,7 +19,7 @@ const Empty = z.object({});
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
-const linear = createWorkflow({ name: 'linear', states: ['s1', 's2', 's3'] })
+const linear = createWorkflow({ name: 'linear' })
   .defineAction('NEXT', Empty)
   .defineAction('SKIP', Empty)
   .addStep('s1')
@@ -34,16 +34,15 @@ const linear = createWorkflow({ name: 'linear', states: ['s1', 's2', 's3'] })
 
 const parallel = createWorkflow({
   name: 'parallel',
-  states: ['start', 'fork', 'a', 'b', 'join', 'end'],
 })
   .defineAction('START', Empty)
   .defineAction('DONE_A', Empty)
   .defineAction('DONE_B', Empty)
   .defineAction('FINISH', Empty)
   .addStep('start')
-  .addFork('fork', { targets: ['a', 'b'] })
   .addStep('a')
   .addStep('b')
+  .addFork('fork', { targets: ['a', 'b'] })
   .addJoin('join', { requires: ['a', 'b'], mode: 'all' })
   .addStep('end')
   .setInitial('start')
@@ -54,7 +53,7 @@ const parallel = createWorkflow({
   .addTransition({ from: 'join', to: 'end', on: 'FINISH' })
   .build();
 
-const subWf = createWorkflow({ name: 'sub-wf', states: ['begin', 'external', 'done'] })
+const subWf = createWorkflow({ name: 'sub-wf' })
   .defineAction('ENTER', Empty)
   .defineAction('COMPLETE', Empty)
   .addStep('begin')

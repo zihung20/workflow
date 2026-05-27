@@ -9,19 +9,16 @@ import { createWorkflow } from 'flowyd';
 ## `createWorkflow(config)`
 
 ```ts
-function createWorkflow<const TStates extends string>(config: {
+function createWorkflow(config: {
   name: string;
-  states: readonly [TStates, ...TStates[]];
-}): WorkflowBuilder<Record<never, never>, TStates>
+}): WorkflowBuilder<Record<never, never>, never>
 ```
 
-Instantiates a `WorkflowBuilder` and infers the `TStates` literal union from the `states` array. Every subsequent call is constrained to that union — typos are compile errors.
+Instantiates a `WorkflowBuilder` with `TStates = never`. Each subsequent `addStep`, `addFork`, `addJoin`, or `addWait` call widens `TStates` by one literal — every call is constrained to the accumulated union, so typos are compile errors.
 
 ```ts
-const wf = createWorkflow({
-  name: 'purchase-order',
-  states: ['draft', 'review', 'approved', 'rejected'],
-});
+const wf = createWorkflow({ name: 'purchase-order' });
+// TStates = never initially; grows with each addStep/addFork/addJoin/addWait call
 ```
 
 **Throws** if `name` is empty or whitespace.
@@ -54,10 +51,10 @@ Registers an action and binds a Zod schema to its payload. Returns a new builder
 ## `.addStep(id, options?)`
 
 ```ts
-addStep(id: TStates, options?: { label?: string }): this
+addStep<K extends string>(id: K, options?: { label?: string }): WorkflowBuilder<TActions, TStates | K>
 ```
 
-Registers a `StepState`. Becomes `active` on entry; waits for a dispatch to advance.
+Registers a `StepState` and widens `TStates` to include `K`. Becomes `active` on entry; waits for a dispatch to advance.
 
 ## `.addFork(id, options)`
 

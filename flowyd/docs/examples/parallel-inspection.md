@@ -53,23 +53,10 @@ const DepartSchema = z.object({
 
 // ── Workflow definition ─────────────────────────────────────────────────────
 //
-// `addFork` targets and `addJoin` requires both autocomplete to the declared
-// state union. A misspelled target is a compile error.
+// `addFork` targets and `addJoin` requires both autocomplete to the accumulated
+// TStates union. Branch states must be registered before the fork that targets them.
 
-const engineerChecklist = createWorkflow({
-  name: 'engineer-predeparture-checklist',
-  states: [
-    'reported-for-duty',
-    'briefed',
-    'inspection-fork',
-    'mechanical',
-    'electrical',
-    'safety-systems',
-    'inspections-joined',
-    'signed-off',
-    'departed',
-  ],
-})
+const engineerChecklist = createWorkflow({ name: 'engineer-predeparture-checklist' })
   .defineAction('BRIEFING_RECEIVED', BriefingSchema)
   .defineAction('START_INSPECTION', z.object({}))
   .defineAction('MECH_OK', InspectionSchema)
@@ -80,13 +67,13 @@ const engineerChecklist = createWorkflow({
 
   .addStep('reported-for-duty', { label: 'Reported for Duty' })
   .addStep('briefed', { label: 'Briefed' })
+  .addStep('mechanical', { label: 'Mechanical Check' })
+  .addStep('electrical', { label: 'Electrical Check' })
+  .addStep('safety-systems', { label: 'Safety Systems Check' })
   .addFork('inspection-fork', {
     label: 'Inspection Fork',
     targets: ['mechanical', 'electrical', 'safety-systems'],
   })
-  .addStep('mechanical', { label: 'Mechanical Check' })
-  .addStep('electrical', { label: 'Electrical Check' })
-  .addStep('safety-systems', { label: 'Safety Systems Check' })
   .addJoin('inspections-joined', {
     label: 'Inspections Complete',
     requires: ['mechanical', 'electrical', 'safety-systems'],

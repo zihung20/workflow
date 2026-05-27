@@ -9,7 +9,6 @@ const RejectSchema = z.object({ reason: z.string() });
 
 const purchaseOrder = createWorkflow({
   name: 'purchase-order',
-  states: ['draft', 'pending-approval', 'approved', 'rejected'],
 })
   .defineAction('SUBMIT', SubmitSchema)
   .defineAction('APPROVE', ApproveSchema)

@@ -19,33 +19,39 @@ import { WaitState } from '../states/wait-state.js';
 /**
  * Fluent builder for composing and validating a workflow definition.
  *
- * ## Config-First construction
+ * ## Accumulating-Builder construction
  *
- * Pass all valid state IDs upfront in the constructor. This establishes the
- * `TStates` union at the point of instantiation, so every subsequent call
- * (`addStep`, `addFork`, `addJoin`, `setInitial`, `setTerminal`,
- * `addTransition`) is constrained to that fixed set of names. IDEs will
- * autocomplete state IDs throughout the chain without the caller maintaining a
- * separate type union.
+ * Call `createWorkflow({ name })` to start. Each call to `addStep`, `addFork`,
+ * `addJoin`, or `addWait` widens the `TStates` union by one literal, so every
+ * subsequent call is constrained to the growing set of registered IDs — no
+ * upfront array needed. IDEs autocomplete state IDs as they are registered.
  *
  * ```ts
- * const builder = createWorkflow({
- *   name: 'my-workflow',
- *   states: ['pending', 'fork', 'branch-a', 'branch-b', 'joined', 'done'],
- * });
+ * const builder = createWorkflow({ name: 'my-workflow' })
+ *   .addStep('pending')
+ *   .addStep('branch-a')
+ *   .addStep('branch-b')
+ *   .addFork('fork', { targets: ['branch-a', 'branch-b'] })
+ *   .addStep('joined')
+ *   .addStep('done');
  * ```
+ *
+ * **Ordering rule for fork/join:** `addFork.targets` and `addJoin.requires` are
+ * constrained to states already in `TStates`. Register branch/prerequisite
+ * states before the fork or join that references them.
  *
  * ## Typical call order
  *
- * 1. Constructor — declare the name and all state IDs.
+ * 1. `createWorkflow({ name })` — start the builder.
  * 2. `defineAction()` — register each action and its Zod payload schema.
- * 3. `addStep()` / `addFork()` / `addJoin()` / `addWait()` — register states.
+ * 3. `addStep()` / `addFork()` / `addJoin()` / `addWait()` — register states (branches before forks/joins).
  * 4. `setInitial()` / `setTerminal()` — declare entry and exit points.
  * 5. `addTransition()` — wire states together with named, optionally-guarded arcs.
  * 6. `build()` — validate and compile into an immutable `Workflow`.
  *
- * `defineAction()` returns a new builder instance so that the `TActions`
- * generic accumulates correctly across calls. All other methods return `this`.
+ * `defineAction()` and the four state-registration methods return a new builder
+ * instance so that `TActions` and `TStates` generics accumulate correctly.
+ * `setInitial`, `setTerminal`, and `addTransition` return `this`.
  *
  * `addState()` is an escape hatch for externally-constructed state objects when
  * the typed factory methods are not suitable.
@@ -69,15 +75,14 @@ export class WorkflowBuilder<
   private terminalStateIds: string[] = [];
 
   /**
-   * Creates a new `WorkflowBuilder` with the full set of state IDs declared
-   * upfront. Prefer the {@link createWorkflow} factory which automatically
-   * preserves literal types without needing `as const` at the call site.
+   * Creates a new `WorkflowBuilder`. Prefer the {@link createWorkflow} factory
+   * which starts with `TStates = never` and accumulates state IDs via the
+   * `addStep` / `addFork` / `addJoin` / `addWait` call chain.
    *
-   * @param config.name   - Workflow name. Must be non-empty.
-   * @param config.states - Array of every state ID in the graph.
+   * @param config.name - Workflow name. Must be non-empty.
    * @throws {Error} If `name` is empty.
    */
-  constructor(config: { name: string; states: readonly TStates[] }) {
+  constructor(config: { name: string }) {
     if (!config.name.trim()) {
       throw new Error('Workflow name must be non-empty');
     }
@@ -110,69 +115,81 @@ export class WorkflowBuilder<
    * Creates and registers a `StepState` — the fundamental SOP milestone that
    * waits for an explicit dispatched action before advancing.
    *
-   * @param id      - Must be one of the state IDs declared in the constructor.
+   * Widens the `TStates` generic to include `K`, making `id` available as a
+   * valid target in subsequent `setInitial`, `setTerminal`, `addTransition`,
+   * `addFork.targets`, and `addJoin.requires` calls.
+   *
+   * @param id      - Unique state identifier. Becomes part of `TStates` after this call.
    * @param options - Optional display label (defaults to `id`).
-   * @returns `this` for chaining.
+   * @returns A new builder with `TStates` widened to `TStates | K`.
    * @throws {Error} If a state with the same `id` is already registered.
    */
-  addStep(id: TStates, options: { label?: string } = {}): this {
+  addStep<K extends string>(id: K, options: { label?: string } = {}): WorkflowBuilder<TActions, TStates | K> {
     this.stateRegistry.register(new StepState(id, options));
-    return this;
+    return this as unknown as WorkflowBuilder<TActions, TStates | K>;
   }
 
   /**
    * Creates and registers a `ForkState` that atomically activates one or more
    * downstream states in parallel when entered.
    *
-   * The `targets` array is constrained to `TStates`, so IDEs will autocomplete
-   * only the state IDs declared in the constructor.
+   * `targets` is constrained to `TStates` (states already registered via
+   * `addStep`/`addFork`/`addJoin`/`addWait`). Register all branch states before
+   * calling `addFork` — unregistered IDs are compile-time errors.
    *
-   * @param id      - Must be one of the state IDs declared in the constructor.
-   * @param options - `targets`: non-empty array of state IDs to activate in parallel.
+   * @param id      - Unique state identifier for the fork node.
+   * @param options - `targets`: non-empty array of already-registered state IDs to activate in parallel.
    *                  `label`: optional display label.
-   * @returns `this` for chaining.
+   * @returns A new builder with `TStates` widened to `TStates | K`.
    * @throws {Error} If `targets` is empty or if the `id` is already registered.
    */
-  addFork(id: TStates, options: { label?: string; targets: [TStates, ...TStates[]] }): this {
+  addFork<K extends string>(
+    id: K,
+    options: { label?: string; targets: [TStates, ...TStates[]] },
+  ): WorkflowBuilder<TActions, TStates | K> {
     this.stateRegistry.register(new ForkState(id, options));
-    return this;
+    return this as unknown as WorkflowBuilder<TActions, TStates | K>;
   }
 
   /**
    * Creates and registers a `JoinState` — a synchronisation barrier that
    * becomes `active` automatically once the completion threshold is met.
    *
-   * The `requires` array is constrained to `TStates`, so IDEs will autocomplete
-   * only the state IDs declared in the constructor.
+   * `requires` is constrained to `TStates` (states already registered via
+   * `addStep`/`addFork`/`addJoin`/`addWait`). Register all prerequisite states
+   * before calling `addJoin` — unregistered IDs are compile-time errors.
    *
-   * @param id      - Must be one of the state IDs declared in the constructor.
-   * @param options - `requires`: non-empty array of prerequisite state IDs.
+   * @param id      - Unique state identifier for the join node.
+   * @param options - `requires`: non-empty array of already-registered prerequisite state IDs.
    *                  `mode`:    `'all'` (default) | `'any'` | a quorum number.
    *                  `label`:   optional display label.
-   * @returns `this` for chaining.
+   * @returns A new builder with `TStates` widened to `TStates | K`.
    * @throws {Error} If `requires` is empty or if the `id` is already registered.
    */
-  addJoin(
-    id: TStates,
+  addJoin<K extends string>(
+    id: K,
     options: { label?: string; requires: [TStates, ...TStates[]]; mode?: JoinMode },
-  ): this {
+  ): WorkflowBuilder<TActions, TStates | K> {
     this.stateRegistry.register(new JoinState(id, options));
-    return this;
+    return this as unknown as WorkflowBuilder<TActions, TStates | K>;
   }
 
   /**
    * Creates and registers a `WaitState` that pauses the parent workflow until
    * an external signal arrives via `instance.resolveWait(stateId)`.
    *
-   * @param id      - Must be one of the state IDs declared in the constructor.
+   * @param id      - Unique state identifier for the wait node.
    * @param options - `externalName`: name of the external process being waited on.
    *                  `label`:        optional display label.
-   * @returns `this` for chaining.
+   * @returns A new builder with `TStates` widened to `TStates | K`.
    * @throws {Error} If a state with the same `id` is already registered.
    */
-  addWait(id: TStates, options: { label?: string; externalName: string }): this {
+  addWait<K extends string>(
+    id: K,
+    options: { label?: string; externalName: string },
+  ): WorkflowBuilder<TActions, TStates | K> {
     this.stateRegistry.register(new WaitState(id, options));
-    return this;
+    return this as unknown as WorkflowBuilder<TActions, TStates | K>;
   }
 
   /**
@@ -321,29 +338,35 @@ export class WorkflowBuilder<
 }
 
 /**
- * Creates a new {@link WorkflowBuilder} with all state IDs declared upfront.
+ * Creates a new {@link WorkflowBuilder} with `TStates` starting as `never`.
  *
- * The `const` type parameter modifier automatically infers literal state-ID
- * types from a plain array — no `as const` needed at the call site. When
- * `states` is a runtime `string[]`, TypeScript infers `TStates = string` and
- * the builder falls back to runtime-only validation via `build()`.
+ * Each call to `addStep`, `addFork`, `addJoin`, or `addWait` widens `TStates`
+ * by one literal, so all subsequent calls are constrained to the growing set
+ * of registered IDs — no upfront array needed.
+ *
+ * For workflows whose state IDs are only known at runtime (e.g. loaded from a
+ * database), cast to a wide builder after construction:
  *
  * ```ts
- * // Static: full compile-time safety, no `as const` needed
- * const wf = createWorkflow({ name: 'po', states: ['draft', 'review', 'done'] });
+ * // Static: TStates accumulates automatically
+ * const wf = createWorkflow({ name: 'po' })
+ *   .addStep('draft')
+ *   .addStep('review')
+ *   .addStep('done')
+ *   ...
  *
- * // Dynamic: states from a database or user input
- * const wf = createWorkflow({ name: 'dynamic', states: fetchedStates });
+ * // Dynamic: cast to wide builder, runtime validation falls to build()
+ * const builder = createWorkflow({ name: 'dynamic' }) as unknown as
+ *   WorkflowBuilder<Record<string, unknown>, string>;
+ * for (const id of fetchedStates) { builder.addStep(id); }
  * ```
  *
- * @param config.name   - Workflow name. Must be non-empty.
- * @param config.states - Every state ID in the graph.
- * @returns A `WorkflowBuilder` constrained to the declared state IDs.
+ * @param config.name - Workflow name. Must be non-empty.
+ * @returns A `WorkflowBuilder` with `TStates = never`, ready to accumulate state IDs.
  * @throws {Error} If `name` is empty.
  */
-export function createWorkflow<const TStates extends string>(config: {
+export function createWorkflow(config: {
   name: string;
-  states: readonly TStates[];
-}): WorkflowBuilder<Record<never, never>, TStates> {
-  return new WorkflowBuilder<Record<never, never>, TStates>(config);
+}): WorkflowBuilder<Record<never, never>, never> {
+  return new WorkflowBuilder<Record<never, never>, never>(config);
 }

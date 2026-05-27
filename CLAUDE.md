@@ -126,15 +126,12 @@ Treat a violation as a build error even when the compiler does not catch it.
 
 ---
 
-### Config-First WorkflowBuilder
+### Accumulating Builder
 
-All state IDs are declared upfront in the constructor. This establishes the `TStates` union at instantiation, so `addStep`, `addFork`, `addJoin`, `addWait`, `setInitial`, `setTerminal`, and `addTransition` are all constrained to that fixed set — typos fail at compile time.
+State IDs are inferred from `addStep`, `addFork`, `addJoin`, and `addWait` calls — each registration widens the `TStates` union by one literal. No upfront `states` array is needed. `setInitial`, `setTerminal`, `addTransition`, and the `targets`/`requires` options are all constrained to the accumulated set — typos fail at compile time.
 
 ```ts
-const wf = createWorkflow({
-  name: 'my-workflow',
-  states: ['draft', 'review', 'approved', 'rejected'],  // no `as const` needed
-})
+const wf = createWorkflow({ name: 'my-workflow' })
   .defineAction('SUBMIT', z.object({ submitterId: z.string() }))
   .addStep('draft')
   .addStep('review')
@@ -147,11 +144,12 @@ const wf = createWorkflow({
 ```
 
 **Rules:**
-- Use `createWorkflow()` — the `const` type parameter infers literal types automatically.
-- Never use `new WorkflowBuilder('name')` (old positional signature — removed) or `new WorkflowBuilder({...})` directly.
+- Use `createWorkflow({ name })` — `TStates` starts as `never` and grows with each state-registration call.
+- Never use `new WorkflowBuilder({...})` directly.
 - Every state must be registered via `addStep`, `addFork`, `addJoin`, or `addWait`. There is no `addState` escape hatch.
-- `addFork` targets and `addJoin` requires autocomplete to the `TStates` union. A reference to an unregistered ID is both a compile-time error and a `build()` runtime error.
-- `defineAction` returns a new generic specialization (`WorkflowBuilder<TActions & Record<K, T>, TStates>`) because `TActions` must accumulate per call. The runtime object is unchanged; only the TypeScript type widens. All other methods return `this`.
+- **Ordering rule for fork/join:** `addFork.targets` and `addJoin.requires` are constrained to states already in `TStates`. Register branch/prerequisite states *before* the fork or join that references them — unregistered IDs are compile-time errors.
+- `defineAction` and the four state-registration methods return a new generic specialization; the runtime object is unchanged, only the TypeScript type widens. `setInitial`, `setTerminal`, and `addTransition` return `this`.
+- **Dynamic workflows** (state IDs only known at runtime): cast to a wide builder — `createWorkflow({ name }) as unknown as WorkflowBuilder<Record<string, unknown>, string>` — and rely on `build()` for validation.
 
 ---
 
@@ -249,6 +247,7 @@ pnpm test:e2e          # e2e only
 | Importing `visualization/` from `core/` | breaks layer separation |
 | Parallel `type`/`interface` alongside a Zod schema | duplicates source of truth |
 | `new WorkflowBuilder('name')` | old positional API — removed |
+| `states: [...]` in `createWorkflow` | removed; `TStates` accumulates from `addStep`/`addFork`/`addJoin`/`addWait` |
 | `addState()` | removed; use `addStep`/`addFork`/`addJoin`/`addWait` |
 | `state as IForkState` without a kind guard | use discriminated union narrowing |
 | Non-null assertions without a justifying comment | hides null-safety assumptions |
@@ -281,63 +280,6 @@ After every code change:
 
 ## 5. Project Version History
 
-### [v0.1.0–v0.7.0] 2026-05-24/25 — Foundation through createWorkflow factory
+### [v0.1.0–v0.12.0] 2026-05-24/27 — Full project history (condensed)
 
-- **v0.1.0**: TSDoc on all exports; `AnyState` discriminated union; Vitest workspace (unit/integration/e2e); 141 tests.
-- **v0.2.0**: VitePress `docs/` site (Diátaxis structure).
-- **v0.3.0**: `../web-runner/` React SPA — Vite + Tailwind + @xyflow/react; dagre layout; Zod-introspected dispatch forms.
-- **v0.4.0** *(breaking)*: Config-First WorkflowBuilder — states declared upfront; typed `addStep`/`addFork`/`addJoin`/`addWait`; removed `addState()`.
-- **v0.5.0**: Trimmed public barrel — concrete state/guard classes removed; all guard composition via `Guard` namespace.
-- **v0.6.0–v0.7.0** *(breaking)*: `createWorkflow()` factory replaces `new WorkflowBuilder({ states: [...] as const })`; dynamic-workflow integration tests (19 tests); lint fixed across 11 files. 162 tests pass.
-
-### [v0.8.0] 2026-05-25 — Rename SubWorkflowState → WaitState *(breaking)*
-
-- `SubWorkflowState` → `WaitState`; `ISubWorkflowState` → `IWaitState`; `StateKind.SubWorkflow = 'sub-workflow'` → `StateKind.Wait = 'wait'`.
-- `addSubWorkflow(id, { subWorkflowName })` → `addWait(id, { externalName })` on `WorkflowBuilder`.
-- `instance.resolveSubWorkflow()` → `instance.resolveWait()`; history action key `__resolve_sub_workflow:` → `__resolve_wait:`.
-- File renames: `sub-workflow-state.ts` → `wait-state.ts`, `sub-workflow.test.ts` → `wait.test.ts`, `sub-workflows.md` → `wait-state.md`.
-- All docs, tests, examples, and web-runner updated. 162 tests pass; all four pipeline steps clean.
-
-### [v0.9.0] 2026-05-26 — Mermaid exporter fixes + web-runner export toolbar
-
-- Fixed spurious `[*] --> forkState : fork` arrow that appeared as a second initial transition in `stateDiagram-v2`.
-- Added `direction LR` to Mermaid output for horizontal left-to-right layout.
-- Added `classDef active/waiting/completed` blocks so live-status colour annotations render in mermaid.live and GitHub without extra configuration.
-- Added export toolbar to `SingleRunner`: **Copy Mermaid** (clipboard), **Download .mmd**, **Download JSON**, **Mermaid Live ↗** (opens with pako-compressed URL via native `CompressionStream`). 167 tests pass; all pipeline steps clean.
-
-### [v0.10.1] 2026-05-27 — Enforce curly braces on all if statements
-
-- Added `"curly": "error"` to `.eslintrc.json` — every `if`/`else` body must have braces, no exceptions. Chosen over `multi-line` to eliminate the Prettier interaction: if a one-liner exceeds `printWidth`, Prettier wraps it to the next line, which `multi-line` would then flag — requiring braces anyway. Always-braces cuts that cycle.
-- Ran `pnpm lint:fix` to auto-add braces across all violations, then `pnpm format` to reformat. 167 tests pass; all pipeline steps clean.
-
-### [v0.10.0] 2026-05-27 — Prettier setup + clean-code refactors
-
-- Added Prettier (`^3.8.3`) with `.prettierrc` (printWidth 100, singleQuote, trailingComma all) and `pnpm format` / `pnpm format:check` scripts.
-- Ran `pnpm format` across the codebase — removed manual column-alignment in object literals throughout `src/`, `tests/`, `examples/`, and `docs/`.
-- Refactored `mermaid.ts`: extracted `stateDeclarationLine()` helper with an exhaustive `switch` to replace a three-branch if-else chain.
-- Refactored `json-graph.ts`: replaced three sequential `if (state.kind === ...)` checks with a single `switch` block.
-- Expanded `CONTRIBUTING.md` with a comprehensive Code Style section covering formatting, naming, conditionals (early returns, boolean expressions, switch vs if-else), casting (discriminated-union narrowing, non-null assertions, `unknown` over `any`), Zod, error handling, and comments. 167 tests pass; all pipeline steps clean.
-
-### [v0.10.2] 2026-05-27 — Move test helpers out of src/
-
-- Moved `src/testing/helpers.ts` → `tests/helpers.ts`; deleted `src/testing/` directory.
-- Updated imports in 5 guard unit test files (`and`, `or`, `not`, `state`, `inject`).
-- Updated CLAUDE.md file map and Vitest section to reflect new location. 167 tests pass; all pipeline steps clean.
-
-### [v0.10.3] 2026-05-27 — Mermaid fork/join native notation + direction TD
-
-- Fork states now declared as `state id <<fork>>` and join states as `state id <<join>>` — Mermaid renders these as UML synchronisation bars instead of labelled boxes.
-- Changed layout direction from `LR` to `TD` (top-to-bottom).
-- Eliminated duplicate fan-in arrows to join states: transitions to join states are skipped from the main transition loop and emitted once without labels via the `requires` block. Removed `✓` labels from join fan-in arrows.
-- `kindSuffix()` now returns `''` for Fork and Join (visual distinction is via the bar notation). 167 tests pass; all pipeline steps clean.
-
-### [v0.11.0] 2026-05-27 — Documentation restructure: user guide + developer guide
-
-- Replaced Diátaxis `tutorials/` / `how-to/` / `reference/` / `explanation/` structure with two top-level sections: **User Guide** (`/guide/`, `/examples/`, `/scenarios/`, `/api/`) and **Developer Guide** (`/dev/`).
-- Added `flowyd/README.md` with project introduction, compile-time type-safety showcase (three annotated error examples), quick-start snippet, and links to full docs.
-- New `/guide/` section: introduction with strict-typing selling point, core-concepts page (all four state types with diagrams), installation page.
-- New `/examples/` section: four complete copy-pasteable workflows — Purchase Order Approval, Engineer Pre-Departure Checklist (from `examples/engineer-predeparture-checklist.ts`), OCC Disruption SOP (from `examples/occ-disruption-sop.ts`), Station Opening Checklist (from `examples/station-opening-checklist.ts`).
-- New `/scenarios/` section: five task-based guides (sequential flow, parallel branches, external wait, guards, persistence) — migrated and tightened from old how-to pages.
-- New `/api/` section: five consolidated pages (WorkflowBuilder; WorkflowInstance + DispatchResult; State Types; Guards; Visualization) — replaces six separate reference pages.
-- New `/dev/` section: architecture, fixed-point engine, design decisions, contributing guide.
-- VitePress config updated with multi-sidebar nav. `pnpm docs:build` exits clean.
+Core library built iteratively: typed `WorkflowBuilder` (accumulating `TStates`/`TActions` generics), pure stateless `WorkflowEngine`, `WorkflowInstance` with snapshot round-trip, `Guard` factory, four state types (`Step`/`Fork`/`Join`/`Wait`), Zod payload validation. Key milestones: `createWorkflow()` factory (v0.7.0); `SubWorkflowState` → `WaitState` rename (v0.8.0, breaking); Mermaid exporter with fork/join `<<fork>>`/`<<join>>` bars, colour `classDef`, `direction TD` (v0.9.0–v0.10.3); Prettier + ESLint curly-braces rule; test helpers relocated to `tests/` (v0.10.0–v0.10.2); VitePress docs restructured to User + Developer Guide (v0.11.0); **Drop upfront `states` array** — `TStates` now accumulates per `addStep`/`addFork`/`addJoin`/`addWait` call (same pattern as `TActions`), no constructor array needed, branch states must precede the fork/join that references them, dynamic workflows cast to `WorkflowBuilder<Record<string, unknown>, string>` (v0.12.0, breaking). 167 tests; all pipeline steps clean.

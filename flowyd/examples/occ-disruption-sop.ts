@@ -142,21 +142,6 @@ const isSupervisor = Guard.inject('isSupervisor');
 
 const occDisruptionSop = createWorkflow({
   name: 'occ-service-disruption',
-  states: [
-    'incident-detected',
-    'incident-verified',
-    'duty-manager-notified',
-    'response-authorised',
-    'notification-fork',
-    'ops-team',
-    'stn-masters',
-    'public-comms',
-    'notification-join',
-    'bus-bridging',
-    'service-disrupted',
-    'service-restored',
-    'incident-closed',
-  ],
 })
   .defineAction('VERIFY', IncidentVerifySchema)
   .defineAction('ESCALATE_TO_DM', EscalateSchema)
@@ -175,13 +160,14 @@ const occDisruptionSop = createWorkflow({
   .addStep('incident-verified', { label: 'Incident Verified' })
   .addStep('duty-manager-notified', { label: 'DM Notified' })
   .addStep('response-authorised', { label: 'Response Authorised' })
+  // branches registered first so fork targets are in TStates at call time
+  .addStep('ops-team', { label: 'Notifying Ops Team' })
+  .addStep('stn-masters', { label: 'Notifying Station Masters' })
+  .addStep('public-comms', { label: 'Notifying Public' })
   .addFork('notification-fork', {
     label: 'Notification Fork',
     targets: ['ops-team', 'stn-masters', 'public-comms'],
   })
-  .addStep('ops-team', { label: 'Notifying Ops Team' })
-  .addStep('stn-masters', { label: 'Notifying Station Masters' })
-  .addStep('public-comms', { label: 'Notifying Public' })
   .addJoin('notification-join', {
     label: 'All Parties Notified',
     requires: ['ops-team', 'stn-masters', 'public-comms'],

@@ -419,5 +419,214 @@ grep -rn ' as I[A-Z]\| as StateStatus' src/ | grep -v '\.test\.'
 
 ---
 
-get a good name
+## Phase 4: Drop Upfront `states` Array — Infer `TStates` from Builder Calls
 
+**Status:** NOT STARTED
+
+### Motivation
+
+The Config-First builder requires every state ID to be declared upfront in a `states: [...]` array before it can be used anywhere else. This creates a "double registration": declare in the array, then define with `addStep`/`addFork`/`addJoin`/`addWait`. The array exists solely to establish the `TStates` generic — it carries no runtime meaning.
+
+The fix: make each `addStep`/`addFork`/`addJoin`/`addWait` call **accumulate** `TStates` incrementally, the same way `defineAction` already accumulates `TActions`. Drop the upfront array entirely.
+
+Type safety — the selling point — is fully preserved. In fact it becomes stricter: `addFork.targets` and `addJoin.requires` are constrained to states that have already been registered at the point of the call, catching forward-reference errors at compile time rather than `build()` runtime.
+
+---
+
+### TypeScript Mechanics
+
+`defineAction` already demonstrates the accumulating-generic pattern:
+
+```ts
+// Current: TActions grows with each defineAction call
+defineAction<K extends string, T>(name: K, schema: ZodSchema<T>)
+  : WorkflowBuilder<TActions & Record<K, T>, TStates>   // ← new type, same runtime object
+```
+
+Apply the same pattern to the four state-registration methods:
+
+```ts
+// Proposed: TStates grows with each addStep/addFork/addJoin/addWait call
+addStep<K extends string>(id: K, options?: { label?: string })
+  : WorkflowBuilder<TActions, TStates | K>
+
+addFork<K extends string>(id: K, options: {
+  targets: [TStates, ...TStates[]];   // ← constrained to already-registered states
+  label?: string;
+}): WorkflowBuilder<TActions, TStates | K>
+
+addJoin<K extends string>(id: K, options: {
+  requires: [TStates, ...TStates[]];  // ← constrained to already-registered states
+  mode?: JoinMode;
+  label?: string;
+}): WorkflowBuilder<TActions, TStates | K>
+
+addWait<K extends string>(id: K, options: { externalName: string; label?: string })
+  : WorkflowBuilder<TActions, TStates | K>
+```
+
+`setInitial`, `setTerminal`, and `addTransition` already return `this` and are already constrained to `TStates` — they need no changes.
+
+The implementation of each accumulating method is a single cast at the return site:
+
+```ts
+addStep<K extends string>(id: K, options: { label?: string } = {}): WorkflowBuilder<TActions, TStates | K> {
+  this.stateRegistry.register(new StepState(id, options));
+  return this as unknown as WorkflowBuilder<TActions, TStates | K>;
+}
+```
+
+---
+
+### The Ordering Constraint (and why it is good)
+
+Since `addFork.targets` is typed `[TStates, ...TStates[]]`, TypeScript requires that every target state is already registered at the point `addFork` is called. This means **branch states must be declared before the fork or join that references them**.
+
+**Before (Config-First — any order, states array as the source of truth):**
+```ts
+createWorkflow({
+  name: 'predeparture',
+  states: ['reported-for-duty', 'briefed', 'inspection-fork',
+           'mechanical', 'electrical', 'safety-systems',
+           'inspections-joined', 'signed-off', 'departed'],
+})
+  .addFork('inspection-fork', {
+    targets: ['mechanical', 'electrical', 'safety-systems'],  // forward ref — OK because states array
+  })
+  .addStep('mechanical')
+  .addStep('electrical')
+  .addStep('safety-systems')
+```
+
+**After (no states array — branches must precede fork):**
+```ts
+createWorkflow({ name: 'predeparture' })
+  .addStep('reported-for-duty')
+  .addStep('briefed')
+  // Register branches first — TypeScript enforces this
+  .addStep('mechanical')
+  .addStep('electrical')
+  .addStep('safety-systems')
+  // Now fork can reference them — all three are in TStates
+  .addFork('inspection-fork', {
+    targets: ['mechanical', 'electrical', 'safety-systems'],
+  })
+  // Join similarly — branches already in TStates
+  .addJoin('inspections-joined', {
+    requires: ['mechanical', 'electrical', 'safety-systems'],
+    mode: 'all',
+  })
+  .addStep('signed-off')
+  .addStep('departed')
+  .setInitial('reported-for-duty')
+  .setTerminal(['departed'])
+  .addTransition({ from: 'reported-for-duty', to: 'briefed',        on: 'BRIEFING_RECEIVED' })
+  .addTransition({ from: 'briefed',           to: 'inspection-fork', on: 'START_INSPECTION' })
+  .addTransition({ from: 'mechanical',        to: 'inspections-joined', on: 'MECH_OK' })
+  .addTransition({ from: 'electrical',        to: 'inspections-joined', on: 'ELEC_OK' })
+  .addTransition({ from: 'safety-systems',    to: 'inspections-joined', on: 'SAFETY_OK' })
+  .addTransition({ from: 'inspections-joined', to: 'signed-off',    on: 'SIGN_OFF',
+    guard: (ctx) => ctx.payload.certifies === true })
+  .addTransition({ from: 'signed-off',        to: 'departed',       on: 'DEPART' })
+  .build()
+```
+
+The call order changes slightly — branches before fork, prerequisites before join — but this is a natural "declare before use" discipline that TypeScript now enforces. Violating it produces a compile error at the `targets`/`requires` array, not a silent runtime failure at `build()`.
+
+---
+
+### What changes
+
+| Location | Change |
+|---|---|
+| `src/core/builder.ts` | Constructor: remove `states` from config type. `addStep`/`addFork`/`addJoin`/`addWait`: change return type from `this` to `WorkflowBuilder<TActions, TStates \| K>`; add `as unknown as` cast at return site. |
+| `src/core/builder.ts` | `createWorkflow`: remove `const TStates` parameter and `states` from config type. New signature: `(config: { name: string }) => WorkflowBuilder<Record<never,never>, never>`. |
+| `examples/*.ts` (4 files) | Remove `states: [...]` from `createWorkflow` call. Reorder `addFork`/`addJoin` to appear after their branch/prerequisite states. |
+| `tests/integration/**` | Same — remove states array, reorder as needed. |
+| `tests/e2e/**` | Same. |
+| `src/core/builder.test.ts` | Same. |
+| `CLAUDE.md` | Update Section 3 "Config-First WorkflowBuilder" to describe the new "Accumulating Builder" pattern; add version entry to Section 5. |
+| `README.md` | Update quick-start snippet. |
+| `docs/` | Update all code blocks that show `createWorkflow({ states: [...] })`. |
+
+**No changes to:** `WorkflowEngine`, `WorkflowInstance`, `Workflow`, `StateRegistry`, all state classes, all guard classes, `MermaidExporter`, `JsonGraphExporter`, snapshot format, `WorkflowDefinition` type.
+
+---
+
+### What type-safety guarantees are preserved
+
+| Guarantee | Before | After |
+|---|---|---|
+| Typo in `addTransition.from` caught at compile time | Yes (`TStates` from array) | Yes (`TStates` accumulated from calls) |
+| Typo in `addTransition.to` caught at compile time | Yes | Yes |
+| Typo in `addTransition.on` caught at compile time | Yes | Yes |
+| Wrong action payload type in `dispatch` | Yes | Yes |
+| Typo in `addFork.targets` caught at compile time | Yes | Yes — plus forward-reference now also caught |
+| Typo in `addJoin.requires` caught at compile time | Yes | Yes — plus forward-reference now also caught |
+| Typo in `setInitial` caught at compile time | Yes | Yes |
+| Typo in `setTerminal` caught at compile time | Yes | Yes |
+
+The new constraint is **strictly stronger** than the old one on `targets` and `requires`: previously a state in `targets` that was never registered with `addFork` would only fail at `build()` runtime. Now it fails at compile time because the string literal is not assignable to `TStates`.
+
+---
+
+### Phase 4a — Update `WorkflowBuilder` and `createWorkflow`
+
+**File:** `src/core/builder.ts`
+
+1. Change constructor signature from `{ name: string; states: readonly TStates[] }` to `{ name: string }`. Remove the `states` property entirely.
+2. Change `addStep` return type from `this` to `WorkflowBuilder<TActions, TStates | K>`. Add `return this as unknown as WorkflowBuilder<TActions, TStates | K>`.
+3. Same for `addFork` — `targets` is already typed `[TStates, ...TStates[]]`; now `TStates` is the accumulated union at call time rather than a fixed upfront union, so forward references become compile errors automatically.
+4. Same for `addJoin` (same logic for `requires`).
+5. Same for `addWait`.
+6. Change `createWorkflow` signature: remove `const TStates` type parameter and `states` from config. Return type is `WorkflowBuilder<Record<never, never>, never>`.
+
+**Exit criteria:**
+- `pnpm typecheck` — zero errors
+- `pnpm test` — all tests pass (some will fail if they still pass `states: [...]`; fix those in phase 4b)
+
+---
+
+### Phase 4b — Migrate examples and tests
+
+For every call site that uses `createWorkflow({ name: '...', states: [...] })`:
+1. Remove the `states: [...]` property from the call.
+2. Re-order `addStep`/`addFork`/`addJoin`/`addWait` calls so that any state referenced in `targets` or `requires` appears **before** the fork/join that references it.
+
+**Locate all call sites:**
+```sh
+grep -rn 'states:' examples/ tests/ src/
+```
+
+**Exit criteria:**
+- `pnpm lint && pnpm typecheck && pnpm test && pnpm build` — all four clean
+- `grep -rn 'states: \[' examples/ tests/ src/` — zero hits
+
+---
+
+### Phase 4c — Update docs and CLAUDE.md
+
+- Replace every `createWorkflow({ name, states: [...] })` snippet in `docs/` with the new form.
+- Update CLAUDE.md Section 3 "Config-First WorkflowBuilder":
+  - Rename concept to "Accumulating Builder"
+  - Remove the rule about declaring all state IDs upfront
+  - Add the "declare before use" rule for `addFork.targets` / `addJoin.requires`
+  - Update the canonical example
+- Add version entry to CLAUDE.md Section 5.
+- Update `README.md` quick-start snippet.
+
+**Exit criteria:**
+- `pnpm docs:build` — clean
+- No doc page shows `states: [` in a code block
+
+---
+
+### Phase 4 — Execution order summary
+
+| Phase | Scope | Risk | Tests break? |
+|---|---|---|---|
+| 4a | `builder.ts` + `createWorkflow` type changes | Medium — changes public API signature | Yes — call sites still pass `states:[]` |
+| 4b | Migrate all call sites | Low — mechanical | Only if reorder is wrong |
+| 4c | Docs + CLAUDE.md | None | No |
+
+Phases 4a and 4b must be committed together — 4a alone will break the build until call sites are updated.

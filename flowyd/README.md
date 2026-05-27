@@ -15,12 +15,13 @@ Most workflow libraries accept strings everywhere. A typo silently creates dead 
 ### Typo in a state ID — compile error
 
 ```ts
-const wf = createWorkflow({
-  name: 'approval',
-  states: ['draft', 'review', 'approved', 'rejected'],
-})
-  .addStep('approveddd');
-// TS2345: Argument of type '"approveddd"' is not assignable to
+const wf = createWorkflow({ name: 'approval' })
+  .addStep('draft')
+  .addStep('review')
+  .addStep('approved')
+  .addStep('rejected')
+  .setInitial('drft'); // typo
+// TS2345: Argument of type '"drft"' is not assignable to
 // parameter of type '"draft" | "review" | "approved" | "rejected"'
 ```
 
@@ -45,7 +46,9 @@ await inst.dispatch('APPROVE', { approver: 'mgr-1' });
 ### Fork targets and join requires are autocompleted
 
 ```ts
-.addFork('fork', { targets: ['legal', 'finance'] })       // autocompletes to declared state IDs
+.addStep('legal')
+.addStep('finance')
+.addFork('fork', { targets: ['legal', 'finance'] })       // autocompletes to registered state IDs
 .addJoin('join', { requires: ['legal', 'finannce'], mode: 'all' })
 //                                      ^^^^^^^^^ compile error
 ```
@@ -68,10 +71,7 @@ pnpm add flowyd zod
 import { z } from 'zod';
 import { createWorkflow, Guard } from 'flowyd';
 
-const purchaseOrder = createWorkflow({
-  name: 'purchase-order',
-  states: ['draft', 'pending-approval', 'approved', 'rejected'],
-})
+const purchaseOrder = createWorkflow({ name: 'purchase-order' })
   .defineAction('SUBMIT', z.object({ submitterId: z.string() }))
   .defineAction('APPROVE', z.object({ approverId: z.string(), reason: z.string() }))
   .defineAction('REJECT',  z.object({ reason: z.string() }))
@@ -109,7 +109,7 @@ const snapshot = inst.getSnapshot();  // plain JSON — save wherever you want
 
 ## Features
 
-- **Compile-time state ID safety** — all state IDs declared upfront; typos caught immediately
+- **Compile-time state ID safety** — `TStates` accumulates per `addStep`/`addFork`/`addJoin`/`addWait` call; typos caught immediately
 - **Typed actions and payloads** — `dispatch` and `canExecute` typed end-to-end from `defineAction`
 - **Zod-validated at every boundary** — runtime payload validation from the same schema
 - **Parallel branches** — `ForkState` fans out; `JoinState` synchronises (`all` / `any` / quorum)

@@ -70,14 +70,6 @@ const CommenceServiceSchema = z.object({
 
 const stationOpening = createWorkflow({
   name: 'station-opening',
-  states: [
-    'closed',
-    'premises-unlocked',
-    'safety-walk-done',
-    'systems-active',
-    'fare-gates-open',
-    'open-for-service',
-  ],
 })
   .defineAction('UNLOCK_PREMISES', UnlockSchema)
   .defineAction('COMPLETE_SAFETY_WALK', SafetyWalkSchema)

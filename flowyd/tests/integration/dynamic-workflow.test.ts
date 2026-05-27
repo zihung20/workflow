@@ -5,8 +5,8 @@ import { WorkflowBuilder, createWorkflow } from '../../src/core/builder.js';
 // ---------------------------------------------------------------------------
 // Helpers — dynamic builders
 //
-// createWorkflow infers TStates = string when the states array is a runtime
-// string[]. Compile-time state-ID checking is absent; build() is the only guard.
+// State IDs are only known at runtime so we cast to a wide builder type;
+// compile-time state-ID checking is absent — build() is the only guard.
 // ---------------------------------------------------------------------------
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
@@ -15,10 +15,12 @@ function buildLinearChain(stateIds: string[]) {
     throw new Error('need at least 2 states');
   }
 
-  const builder = createWorkflow({ name: 'dynamic-linear', states: stateIds }).defineAction(
-    'NEXT',
-    z.object({}),
-  );
+  // Cast to wide builder: runtime string[] cannot accumulate TStates generics.
+  const builder = createWorkflow({ name: 'dynamic-linear' }) as unknown as WorkflowBuilder<
+    Record<string, unknown>,
+    string
+  >;
+  builder.defineAction('NEXT', z.object({}));
 
   for (const id of stateIds) {
     builder.addStep(id);
@@ -47,14 +49,13 @@ function buildLinearChain(stateIds: string[]) {
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 function buildParallelBranches(branchCount: number) {
   const branches = Array.from({ length: branchCount }, (_, i) => `branch-${i}`);
-  const allStates = ['start', 'fork', ...branches, 'join', 'end'];
 
-  const initial = createWorkflow({ name: 'dynamic-parallel', states: allStates })
+  const initial = createWorkflow({ name: 'dynamic-parallel' })
     .defineAction('START', z.object({}))
     .defineAction('COMPLETE_ALL', z.object({}));
 
-  // Loop-defined action names can't be tracked by TActions; cast to wide type.
-  // At runtime defineAction always returns `this`, so no data is lost.
+  // Loop-defined action names and state IDs can't be tracked by generics; cast to wide type.
+  // At runtime defineAction / addStep always returns `this`, so no data is lost.
   const builder = initial as unknown as WorkflowBuilder<Record<string, unknown>, string>;
 
   for (let i = 0; i < branchCount; i++) {
@@ -170,63 +171,50 @@ describe('Dynamic linear chain', () => {
 // ---------------------------------------------------------------------------
 
 describe('Dynamic builder — runtime validation', () => {
-  it('build() throws when a transition references a state not in the declared list', () => {
-    // Cast to string[] so createWorkflow infers TStates = string; TypeScript
-    // then cannot flag 'ghost' at compile time — only build() catches it.
-    const dynamicStates = ['a', 'b'] as string[];
-    const builder = createWorkflow({ name: 'bad-transition', states: dynamicStates })
-      .defineAction('GO', z.object({}))
-      .addStep('a')
-      .addStep('b')
-      .setInitial('a')
-      .setTerminal(['b'])
-      .addTransition({ from: 'a', to: 'ghost', on: 'GO' });
+  it('build() throws when a transition references an unregistered state', () => {
+    // Cast to wide builder: TypeScript cannot flag 'ghost' at compile time — only build() catches it.
+    const initial = createWorkflow({ name: 'bad-transition' }).defineAction('GO', z.object({}));
+    const builder = initial as unknown as WorkflowBuilder<Record<string, unknown>, string>;
+    builder.addStep('a').addStep('b').setInitial('a').setTerminal(['b']);
+    builder.addTransition({ from: 'a', to: 'ghost', on: 'GO' });
     expect(() => builder.build()).toThrow('"ghost"');
   });
 
   it('build() throws when no initial state is set', () => {
-    const dynamicStates = ['a', 'b'] as string[];
-    const builder = createWorkflow({ name: 'no-initial', states: dynamicStates })
-      .defineAction('GO', z.object({}))
-      .addStep('a')
-      .addStep('b')
-      .setTerminal(['b'])
-      .addTransition({ from: 'a', to: 'b', on: 'GO' });
+    const initial = createWorkflow({ name: 'no-initial' }).defineAction('GO', z.object({}));
+    const builder = initial as unknown as WorkflowBuilder<Record<string, unknown>, string>;
+    builder.addStep('a').addStep('b').setTerminal(['b']);
+    builder.addTransition({ from: 'a', to: 'b', on: 'GO' });
     expect(() => builder.build()).toThrow('initial state');
   });
 
   it('build() throws when no terminal state is set', () => {
-    const dynamicStates = ['a', 'b'] as string[];
-    const builder = createWorkflow({ name: 'no-terminal', states: dynamicStates })
-      .defineAction('GO', z.object({}))
-      .addStep('a')
-      .addStep('b')
-      .setInitial('a')
-      .addTransition({ from: 'a', to: 'b', on: 'GO' });
+    const initial = createWorkflow({ name: 'no-terminal' }).defineAction('GO', z.object({}));
+    const builder = initial as unknown as WorkflowBuilder<Record<string, unknown>, string>;
+    builder.addStep('a').addStep('b').setInitial('a');
+    builder.addTransition({ from: 'a', to: 'b', on: 'GO' });
     expect(() => builder.build()).toThrow('terminal state');
   });
 
-  it('build() throws when a fork target is not in the declared state list', () => {
-    const dynamicStates = ['start', 'fork'] as string[];
-    const builder = createWorkflow({ name: 'bad-fork', states: dynamicStates })
-      .defineAction('GO', z.object({}))
-      .addStep('start')
-      .addFork('fork', { targets: ['missing-branch'] as [string, ...string[]] })
-      .setInitial('start')
-      .setTerminal(['start'])
-      .addTransition({ from: 'start', to: 'fork', on: 'GO' });
+  it('build() throws when a fork target is not a registered state', () => {
+    // 'missing-branch' is never added via addStep — only build() catches it.
+    const initial = createWorkflow({ name: 'bad-fork' }).defineAction('GO', z.object({}));
+    const builder = initial as unknown as WorkflowBuilder<Record<string, unknown>, string>;
+    builder.addStep('start');
+    builder.addFork('fork', { targets: ['missing-branch'] as [string, ...string[]] });
+    builder.setInitial('start').setTerminal(['start']);
+    builder.addTransition({ from: 'start', to: 'fork', on: 'GO' });
     expect(() => builder.build()).toThrow('"missing-branch"');
   });
 
-  it('build() throws when a join requires a state not in the declared list', () => {
-    const dynamicStates = ['start', 'join'] as string[];
-    const builder = createWorkflow({ name: 'bad-join', states: dynamicStates })
-      .defineAction('GO', z.object({}))
-      .addStep('start')
-      .addJoin('join', { requires: ['phantom'] as [string, ...string[]] })
-      .setInitial('start')
-      .setTerminal(['join'])
-      .addTransition({ from: 'start', to: 'join', on: 'GO' });
+  it('build() throws when a join requires an unregistered state', () => {
+    // 'phantom' is never added via addStep — only build() catches it.
+    const initial = createWorkflow({ name: 'bad-join' }).defineAction('GO', z.object({}));
+    const builder = initial as unknown as WorkflowBuilder<Record<string, unknown>, string>;
+    builder.addStep('start');
+    builder.addJoin('join', { requires: ['phantom'] as [string, ...string[]] });
+    builder.setInitial('start').setTerminal(['join']);
+    builder.addTransition({ from: 'start', to: 'join', on: 'GO' });
     expect(() => builder.build()).toThrow('"phantom"');
   });
 });

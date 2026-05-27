@@ -12,16 +12,15 @@ const Empty = z.object({});
  */
 const procurement = createWorkflow({
   name: 'procurement',
-  states: ['start', 'fork', 'legal', 'finance', 'join', 'approved'],
 })
   .defineAction('START', Empty)
   .defineAction('LEGAL_DONE', Empty)
   .defineAction('FINANCE_DONE', Empty)
   .defineAction('FINALIZE', Empty)
   .addStep('start')
-  .addFork('fork', { targets: ['legal', 'finance'] })
   .addStep('legal')
   .addStep('finance')
+  .addFork('fork', { targets: ['legal', 'finance'] })
   .addJoin('join', { requires: ['legal', 'finance'], mode: 'all' })
   .addStep('approved')
   .setInitial('start')
@@ -102,16 +101,15 @@ describe('Parallel-join SOP — procurement', () => {
  */
 const anyJoin = createWorkflow({
   name: 'any-join',
-  states: ['start', 'fork', 'branch-a', 'branch-b', 'join', 'end'],
 })
   .defineAction('GO', Empty)
   .defineAction('DONE_A', Empty)
   .defineAction('DONE_B', Empty)
   .defineAction('PROCEED', Empty)
   .addStep('start')
-  .addFork('fork', { targets: ['branch-a', 'branch-b'] })
   .addStep('branch-a')
   .addStep('branch-b')
+  .addFork('fork', { targets: ['branch-a', 'branch-b'] })
   .addJoin('join', { requires: ['branch-a', 'branch-b'], mode: 'any' })
   .addStep('end')
   .setInitial('start')

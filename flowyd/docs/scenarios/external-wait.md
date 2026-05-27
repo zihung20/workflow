@@ -17,10 +17,7 @@ The engine has **no polling, no callbacks, no I/O**. The `externalName` string i
 import { z } from 'zod';
 import { createWorkflow } from 'flowyd';
 
-const vendorOnboarding = createWorkflow({
-  name: 'vendor-onboarding',
-  states: ['draft', 'kyc-check', 'approved', 'rejected'],
-})
+const vendorOnboarding = createWorkflow({ name: 'vendor-onboarding' })
   .defineAction('SUBMIT', z.object({ vendorId: z.string() }))
   .defineAction('KYC_PASSED', z.object({}))
   .defineAction('KYC_FAILED', z.object({ reason: z.string() }))

@@ -6,7 +6,7 @@ import { StateStatus } from '../types/index.js';
 const Empty = z.object({});
 
 function makeTyped() {
-  return createWorkflow({ name: 'typed', states: ['a', 'b'] })
+  return createWorkflow({ name: 'typed' })
     .defineAction('GO', z.object({ id: z.string() }))
     .defineAction('PING', Empty.strict())
     .addStep('a')
@@ -18,7 +18,7 @@ function makeTyped() {
 }
 
 function makeLinear() {
-  return createWorkflow({ name: 'linear', states: ['a', 'b'] })
+  return createWorkflow({ name: 'linear' })
     .defineAction('GO', Empty)
     .addStep('a')
     .addStep('b')
@@ -29,7 +29,7 @@ function makeLinear() {
 }
 
 function makeWait() {
-  return createWorkflow({ name: 'wait-wf', states: ['start', 'sub', 'end'] })
+  return createWorkflow({ name: 'wait-wf' })
     .defineAction('START', Empty)
     .defineAction('DONE', Empty)
     .addStep('start')
@@ -97,7 +97,7 @@ describe('WorkflowInstance — canExecute dry-run', () => {
   });
 
   it('returns false when a guard blocks', async () => {
-    const wf = createWorkflow({ name: 'guarded', states: ['a', 'b'] })
+    const wf = createWorkflow({ name: 'guarded' })
       .defineAction('GO', Empty)
       .addStep('a')
       .addStep('b')

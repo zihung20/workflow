@@ -22,19 +22,16 @@ The fork fires the moment `START` is dispatched — no extra action is needed. B
 import { z } from 'zod';
 import { createWorkflow } from 'flowyd';
 
-const procurement = createWorkflow({
-  name: 'procurement',
-  states: ['start', 'fork', 'legal', 'finance', 'join', 'approved'],
-})
+const procurement = createWorkflow({ name: 'procurement' })
   .defineAction('START', z.object({}))
   .defineAction('LEGAL_DONE', z.object({ reviewedBy: z.string() }))
   .defineAction('FINANCE_DONE', z.object({ reviewedBy: z.string() }))
   .defineAction('FINALIZE', z.object({}))
 
   .addStep('start')
-  .addFork('fork', { targets: ['legal', 'finance'] })
   .addStep('legal', { label: 'Legal Review' })
   .addStep('finance', { label: 'Finance Review' })
+  .addFork('fork', { targets: ['legal', 'finance'] })
   .addJoin('join', { requires: ['legal', 'finance'], mode: 'all' })
   .addStep('approved')
 

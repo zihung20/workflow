@@ -14,7 +14,6 @@ const Empty = z.object({});
  */
 const vendorOnboarding = createWorkflow({
   name: 'vendor-onboarding',
-  states: ['draft', 'kyc-check', 'approved', 'rejected'],
 })
   .defineAction('SUBMIT', Empty)
   .defineAction('KYC_PASSED', Empty)

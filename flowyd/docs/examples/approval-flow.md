@@ -25,14 +25,10 @@ const RejectSchema = z.object({ reason: z.string() });
 
 // ── Workflow definition ─────────────────────────────────────────────────────
 //
-// All state IDs are declared upfront. TypeScript infers the union
-//   'draft' | 'pending-approval' | 'approved' | 'rejected'
-// so every subsequent call is constrained to that set.
+// TStates accumulates with each addStep call; every subsequent call
+// is constrained to the growing set — typos are compile errors.
 
-const purchaseOrder = createWorkflow({
-  name: 'purchase-order',
-  states: ['draft', 'pending-approval', 'approved', 'rejected'],
-})
+const purchaseOrder = createWorkflow({ name: 'purchase-order' })
   .defineAction('SUBMIT', SubmitSchema)
   .defineAction('APPROVE', ApproveSchema)
   .defineAction('REJECT', RejectSchema)

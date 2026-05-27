@@ -6,7 +6,7 @@ import { StateStatus } from '../types/index.js';
 
 const Empty = z.object({});
 
-const linear = createWorkflow({ name: 'linear', states: ['a', 'b', 'c'] })
+const linear = createWorkflow({ name: 'linear' })
   .defineAction('GO', Empty)
   .defineAction('BACK', Empty)
   .addStep('a')
@@ -40,7 +40,7 @@ describe('Engine — terminal state', () => {
 
 describe('Engine — no-active-source', () => {
   it('returns no-active-source when action has transitions but none from the active state', async () => {
-    const wf = createWorkflow({ name: 'back-test', states: ['a', 'b', 'c'] })
+    const wf = createWorkflow({ name: 'back-test' })
       .defineAction('GO', Empty)
       .defineAction('BACK', Empty)
       .addStep('a')
@@ -74,7 +74,7 @@ describe('Engine — no-active-source', () => {
 
 describe('Engine — invalid-action', () => {
   it('returns invalid-action for an undeclared action name', async () => {
-    const wf = createWorkflow({ name: 'ghost-test', states: ['start', 'end'] })
+    const wf = createWorkflow({ name: 'ghost-test' })
       .defineAction('GO', Empty)
       .addStep('start')
       .addStep('end')
@@ -91,7 +91,7 @@ describe('Engine — invalid-action', () => {
 });
 
 describe('Engine — guard evaluation', () => {
-  const guarded = createWorkflow({ name: 'guarded', states: ['a', 'b'] })
+  const guarded = createWorkflow({ name: 'guarded' })
     .defineAction('GO', Empty)
     .addStep('a')
     .addStep('b')
@@ -120,7 +120,7 @@ describe('Engine — guard evaluation', () => {
   });
 
   it('Guard.fn inline guard receives payload correctly', async () => {
-    const wf = createWorkflow({ name: 'fn-guard', states: ['a', 'b'] })
+    const wf = createWorkflow({ name: 'fn-guard' })
       .defineAction('GO', z.object({ role: z.string() }))
       .addStep('a')
       .addStep('b')
@@ -142,7 +142,7 @@ describe('Engine — guard evaluation', () => {
   });
 
   it('Guard.not inverts a passing guard', async () => {
-    const wf = createWorkflow({ name: 'not-guard', states: ['a', 'b'] })
+    const wf = createWorkflow({ name: 'not-guard' })
       .defineAction('GO', Empty)
       .addStep('a')
       .addStep('b')
@@ -183,16 +183,13 @@ describe('Engine — DispatchResult shape on success', () => {
 });
 
 describe('Engine — Fork fan-out', () => {
-  const forked = createWorkflow({
-    name: 'fork-engine',
-    states: ['start', 'fork', 'x', 'y', 'z', 'join'],
-  })
+  const forked = createWorkflow({ name: 'fork-engine' })
     .defineAction('START', Empty)
     .addStep('start')
-    .addFork('fork', { targets: ['x', 'y', 'z'] })
     .addStep('x')
     .addStep('y')
     .addStep('z')
+    .addFork('fork', { targets: ['x', 'y', 'z'] })
     .addJoin('join', { requires: ['x', 'y', 'z'] })
     .setInitial('start')
     .setTerminal(['join'])
@@ -217,19 +214,16 @@ describe('Engine — Fork fan-out', () => {
 });
 
 describe('Engine — Join fixed-point', () => {
-  const quorum = createWorkflow({
-    name: 'quorum',
-    states: ['start', 'fork', 'a', 'b', 'c', 'join', 'done'],
-  })
+  const quorum = createWorkflow({ name: 'quorum' })
     .defineAction('START', Empty)
     .defineAction('DONE_A', Empty)
     .defineAction('DONE_B', Empty)
     .defineAction('DONE_C', Empty)
     .addStep('start')
-    .addFork('fork', { targets: ['a', 'b', 'c'] })
     .addStep('a')
     .addStep('b')
     .addStep('c')
+    .addFork('fork', { targets: ['a', 'b', 'c'] })
     .addJoin('join', { requires: ['a', 'b', 'c'], mode: 2 })
     .addStep('done')
     .setInitial('start')
@@ -266,7 +260,7 @@ describe('Engine — history', () => {
   });
 
   it('history entry contains the action name and payload', async () => {
-    const wf = createWorkflow({ name: 'payload-history', states: ['a', 'b'] })
+    const wf = createWorkflow({ name: 'payload-history' })
       .defineAction('GO', z.object({ note: z.string() }))
       .addStep('a')
       .addStep('b')

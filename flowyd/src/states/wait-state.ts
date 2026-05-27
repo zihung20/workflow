@@ -22,8 +22,11 @@ import { BaseState } from './base.js';
  *
  * @example
  * ```ts
- * createWorkflow({ name: 'vendor', states: ['draft', 'vendor-approval', 'approved', 'rejected'] })
+ * createWorkflow({ name: 'vendor' })
+ *   .addStep('draft')
  *   .addWait('vendor-approval', { externalName: 'vendor-kyc' })
+ *   .addStep('approved')
+ *   .addStep('rejected')
  *   .addTransition({ from: 'vendor-approval', to: 'approved', on: 'KYC_PASSED' })
  *   .addTransition({ from: 'vendor-approval', to: 'rejected', on: 'KYC_FAILED' })
  * ```

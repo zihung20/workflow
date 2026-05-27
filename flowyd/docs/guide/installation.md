@@ -49,10 +49,7 @@ The complete purchase-order workflow in one file:
 import { z } from 'zod';
 import { createWorkflow, Guard } from 'flowyd';
 
-const purchaseOrder = createWorkflow({
-  name: 'purchase-order',
-  states: ['draft', 'pending-approval', 'approved', 'rejected'],
-})
+const purchaseOrder = createWorkflow({ name: 'purchase-order' })
   .defineAction('SUBMIT', z.object({ submitterId: z.string() }))
   .defineAction('APPROVE', z.object({ approverId: z.string(), reason: z.string() }))
   .defineAction('REJECT', z.object({ reason: z.string() }))

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { createWorkflow } from './builder.js';
 
 function minimalBuilder() {
-  return createWorkflow({ name: 'test', states: ['start', 'end'] })
+  return createWorkflow({ name: 'test' })
     .defineAction('GO', z.object({}))
     .addStep('start')
     .addStep('end')
@@ -18,7 +18,7 @@ describe('WorkflowBuilder', () => {
   });
 
   it('throws when no initial state is declared', () => {
-    const b = createWorkflow({ name: 'test', states: ['start'] })
+    const b = createWorkflow({ name: 'test' })
       .defineAction('GO', z.object({}))
       .addStep('start')
       .setTerminal(['start']);
@@ -26,7 +26,7 @@ describe('WorkflowBuilder', () => {
   });
 
   it('throws when no terminal state is declared', () => {
-    const b = createWorkflow({ name: 'test', states: ['start'] })
+    const b = createWorkflow({ name: 'test' })
       .defineAction('GO', z.object({}))
       .addStep('start')
       .setInitial('start');
@@ -34,7 +34,7 @@ describe('WorkflowBuilder', () => {
   });
 
   it('throws when a transition references an unregistered state', () => {
-    const b = createWorkflow({ name: 'test', states: ['start'] })
+    const b = createWorkflow({ name: 'test' })
       .defineAction('GO', z.object({}))
       .addStep('start')
       .setInitial('start')
@@ -45,7 +45,7 @@ describe('WorkflowBuilder', () => {
   });
 
   it('throws when a transition uses an undeclared action', () => {
-    const b = createWorkflow({ name: 'test', states: ['start', 'end'] })
+    const b = createWorkflow({ name: 'test' })
       .addStep('start')
       .addStep('end')
       .setInitial('start')
@@ -56,7 +56,7 @@ describe('WorkflowBuilder', () => {
   });
 
   it('throws when a ForkState target is unregistered', () => {
-    const b = createWorkflow({ name: 'test', states: ['start', 'fork'] })
+    const b = createWorkflow({ name: 'test' })
       .defineAction('GO', z.object({}))
       .addStep('start')
       // @ts-expect-error — intentional: 'ghost' is not in TStates; verifies build() runtime check
@@ -68,7 +68,7 @@ describe('WorkflowBuilder', () => {
   });
 
   it('throws when a JoinState requires an unregistered state', () => {
-    const b = createWorkflow({ name: 'test', states: ['start', 'join'] })
+    const b = createWorkflow({ name: 'test' })
       .defineAction('GO', z.object({}))
       .addStep('start')
       // @ts-expect-error — intentional: 'ghost' is not in TStates; verifies build() runtime check
@@ -80,7 +80,7 @@ describe('WorkflowBuilder', () => {
   });
 
   it('accumulates TActions generics correctly', () => {
-    const workflow = createWorkflow({ name: 'typed', states: ['draft', 'done'] })
+    const workflow = createWorkflow({ name: 'typed' })
       .defineAction('SUBMIT', z.object({ submitterId: z.string() }))
       .defineAction('APPROVE', z.object({ reason: z.string() }))
       .addStep('draft')
@@ -98,7 +98,7 @@ describe('WorkflowBuilder', () => {
   it('declared states constrain setInitial/setTerminal/addTransition', () => {
     // Compile-time proof: if TStates is not correctly inferred from the constructor,
     // the calls below produce TypeScript errors because the literal IDs are unknown.
-    const workflow = createWorkflow({ name: 'typed-states', states: ['alpha', 'beta'] })
+    const workflow = createWorkflow({ name: 'typed-states' })
       .defineAction('GO', z.object({}))
       .addStep('alpha')
       .addStep('beta')
@@ -111,15 +111,12 @@ describe('WorkflowBuilder', () => {
   });
 
   it('addFork constrains targets to declared state IDs', () => {
-    const workflow = createWorkflow({
-      name: 'fork-typed',
-      states: ['start', 'fork', 'branch-a', 'branch-b', 'done'],
-    })
+    const workflow = createWorkflow({ name: 'fork-typed' })
       .defineAction('GO', z.object({}))
       .addStep('start')
-      .addFork('fork', { targets: ['branch-a', 'branch-b'] })
       .addStep('branch-a')
       .addStep('branch-b')
+      .addFork('fork', { targets: ['branch-a', 'branch-b'] })
       .addStep('done')
       .setInitial('start')
       .setTerminal(['done'])
@@ -130,21 +127,18 @@ describe('WorkflowBuilder', () => {
   });
 
   it('addJoin constrains requires to declared state IDs', () => {
-    const workflow = createWorkflow({
-      name: 'join-typed',
-      states: ['start', 'fork', 'mechanical', 'electrical', 'safety-systems', 'all-clear', 'done'],
-    })
+    const workflow = createWorkflow({ name: 'join-typed' })
       .defineAction('START', z.object({}))
       .defineAction('MECH_OK', z.object({}))
       .defineAction('ELEC_OK', z.object({}))
       .defineAction('SAFETY_OK', z.object({}))
       .defineAction('SIGN_OFF', z.object({}))
       .addStep('start')
-      .addFork('fork', { targets: ['mechanical', 'electrical', 'safety-systems'] })
       .addStep('mechanical')
       .addStep('electrical')
       .addStep('safety-systems')
-      // requires autocompletes to the declared state union:
+      .addFork('fork', { targets: ['mechanical', 'electrical', 'safety-systems'] })
+      // requires autocompletes to the accumulated TStates union:
       .addJoin('all-clear', {
         requires: ['mechanical', 'electrical', 'safety-systems'],
         mode: 'all',
@@ -164,7 +158,7 @@ describe('WorkflowBuilder', () => {
 
   it('infers guard payload type from the action schema', () => {
     // Compile-time proof: ctx.payload is typed as { score: number } without annotation.
-    const workflow = createWorkflow({ name: 'guard-inference', states: ['pending', 'passed'] })
+    const workflow = createWorkflow({ name: 'guard-inference' })
       .defineAction('SCORE', z.object({ score: z.number() }))
       .addStep('pending')
       .addStep('passed')

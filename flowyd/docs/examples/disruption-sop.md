@@ -119,24 +119,7 @@ const FileReportSchema = z.object({
 
 // ── Workflow definition ─────────────────────────────────────────────────────
 
-const occDisruptionSop = createWorkflow({
-  name: 'occ-disruption-sop',
-  states: [
-    'incident-detected',
-    'incident-verified',
-    'duty-manager-notified',
-    'response-authorised',
-    'notification-fork',
-    'ops-team',
-    'stn-masters',
-    'public-comms',
-    'notification-join',
-    'bus-bridging',
-    'service-disrupted',
-    'service-restored',
-    'incident-closed',
-  ],
-})
+const occDisruptionSop = createWorkflow({ name: 'occ-disruption-sop' })
   .defineAction('VERIFY', IncidentVerifySchema)
   .defineAction('ESCALATE_TO_DM', EscalateSchema)
   .defineAction('AUTHORISE_RESPONSE', AuthoriseSchema)
@@ -153,10 +136,10 @@ const occDisruptionSop = createWorkflow({
   .addStep('incident-verified', { label: 'Incident Verified' })
   .addStep('duty-manager-notified', { label: 'DM Notified' })
   .addStep('response-authorised', { label: 'Response Authorised' })
-  .addFork('notification-fork', { targets: ['ops-team', 'stn-masters', 'public-comms'] })
   .addStep('ops-team', { label: 'Ops Team Notified' })
   .addStep('stn-masters', { label: 'Station Masters Notified' })
   .addStep('public-comms', { label: 'Public Comms Notified' })
+  .addFork('notification-fork', { targets: ['ops-team', 'stn-masters', 'public-comms'] })
   .addJoin('notification-join', {
     requires: ['ops-team', 'stn-masters', 'public-comms'],
     mode: 'all',
