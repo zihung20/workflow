@@ -330,3 +330,14 @@ After every code change:
 - Changed layout direction from `LR` to `TD` (top-to-bottom).
 - Eliminated duplicate fan-in arrows to join states: transitions to join states are skipped from the main transition loop and emitted once without labels via the `requires` block. Removed `✓` labels from join fan-in arrows.
 - `kindSuffix()` now returns `''` for Fork and Join (visual distinction is via the bar notation). 167 tests pass; all pipeline steps clean.
+
+### [v0.11.0] 2026-05-27 — Documentation restructure: user guide + developer guide
+
+- Replaced Diátaxis `tutorials/` / `how-to/` / `reference/` / `explanation/` structure with two top-level sections: **User Guide** (`/guide/`, `/examples/`, `/scenarios/`, `/api/`) and **Developer Guide** (`/dev/`).
+- Added `logic-workflow/README.md` with project introduction, compile-time type-safety showcase (three annotated error examples), quick-start snippet, and links to full docs.
+- New `/guide/` section: introduction with strict-typing selling point, core-concepts page (all four state types with diagrams), installation page.
+- New `/examples/` section: four complete copy-pasteable workflows — Purchase Order Approval, Engineer Pre-Departure Checklist (from `examples/engineer-predeparture-checklist.ts`), OCC Disruption SOP (from `examples/occ-disruption-sop.ts`), Station Opening Checklist (from `examples/station-opening-checklist.ts`).
+- New `/scenarios/` section: five task-based guides (sequential flow, parallel branches, external wait, guards, persistence) — migrated and tightened from old how-to pages.
+- New `/api/` section: five consolidated pages (WorkflowBuilder; WorkflowInstance + DispatchResult; State Types; Guards; Visualization) — replaces six separate reference pages.
+- New `/dev/` section: architecture, fixed-point engine, design decisions, contributing guide.
+- VitePress config updated with multi-sidebar nav. `pnpm docs:build` exits clean.

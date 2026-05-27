@@ -8,56 +8,76 @@ export default defineConfig({
   themeConfig: {
     logo: '/logo.svg',
     nav: [
-      { text: 'Tutorials', link: '/tutorials/' },
-      { text: 'How-To', link: '/how-to/' },
-      { text: 'Reference', link: '/reference/' },
-      { text: 'Explanation', link: '/explanation/' },
+      {
+        text: 'User Guide',
+        items: [
+          { text: 'Introduction', link: '/guide/' },
+          { text: 'Examples', link: '/examples/' },
+          { text: 'Scenarios', link: '/scenarios/' },
+          { text: 'API Reference', link: '/api/' },
+        ],
+      },
+      { text: 'Developer Guide', link: '/dev/' },
     ],
 
     sidebar: {
-      '/tutorials/': [
+      '/guide/': [
         {
-          text: 'Tutorials',
+          text: 'User Guide',
           items: [
-            { text: 'Overview', link: '/tutorials/' },
-            { text: 'Build your first workflow', link: '/tutorials/first-workflow' },
+            { text: 'Introduction', link: '/guide/' },
+            { text: 'Core Concepts', link: '/guide/concepts' },
+            { text: 'Installation', link: '/guide/installation' },
           ],
         },
       ],
-      '/how-to/': [
+      '/examples/': [
         {
-          text: 'How-To Guides',
+          text: 'Examples',
           items: [
-            { text: 'Overview', link: '/how-to/' },
-            { text: 'Run steps in parallel', link: '/how-to/parallel-branches' },
-            { text: 'Pause for an external process', link: '/how-to/wait-state' },
-            { text: 'Control transitions with guards', link: '/how-to/guards' },
-            { text: 'Save and restore state', link: '/how-to/persistence' },
+            { text: 'Overview', link: '/examples/' },
+            { text: 'Purchase Order Approval', link: '/examples/approval-flow' },
+            { text: 'Engineer Pre-Departure Checklist', link: '/examples/parallel-inspection' },
+            { text: 'OCC Service Disruption SOP', link: '/examples/disruption-sop' },
+            { text: 'Station Opening Checklist', link: '/examples/station-opening' },
           ],
         },
       ],
-      '/reference/': [
+      '/scenarios/': [
         {
-          text: 'Reference',
+          text: 'Scenarios',
           items: [
-            { text: 'Overview', link: '/reference/' },
-            { text: 'WorkflowBuilder', link: '/reference/workflow-builder' },
-            { text: 'WorkflowInstance', link: '/reference/workflow-instance' },
-            { text: 'State Types', link: '/reference/state-types' },
-            { text: 'Guards', link: '/reference/guards' },
-            { text: 'DispatchResult', link: '/reference/dispatch-result' },
-            { text: 'Visualization', link: '/reference/visualization' },
+            { text: 'Overview', link: '/scenarios/' },
+            { text: 'Define a sequential flow', link: '/scenarios/sequential-flow' },
+            { text: 'Run steps in parallel', link: '/scenarios/parallel-branches' },
+            { text: 'Wait for an external signal', link: '/scenarios/external-wait' },
+            { text: 'Add guards to transitions', link: '/scenarios/guards' },
+            { text: 'Save and restore state', link: '/scenarios/persistence' },
           ],
         },
       ],
-      '/explanation/': [
+      '/api/': [
         {
-          text: 'Explanation',
+          text: 'API Reference',
           items: [
-            { text: 'Overview', link: '/explanation/' },
-            { text: 'Architecture', link: '/explanation/architecture' },
-            { text: 'Fixed-point engine', link: '/explanation/fixed-point-engine' },
-            { text: 'Design decisions', link: '/explanation/design-decisions' },
+            { text: 'Overview', link: '/api/' },
+            { text: 'WorkflowBuilder', link: '/api/workflow-builder' },
+            { text: 'WorkflowInstance & DispatchResult', link: '/api/workflow-instance' },
+            { text: 'State Types', link: '/api/state-types' },
+            { text: 'Guards', link: '/api/guards' },
+            { text: 'Visualization', link: '/api/visualization' },
+          ],
+        },
+      ],
+      '/dev/': [
+        {
+          text: 'Developer Guide',
+          items: [
+            { text: 'Overview', link: '/dev/' },
+            { text: 'Architecture', link: '/dev/architecture' },
+            { text: 'Fixed-Point Engine', link: '/dev/engine' },
+            { text: 'Design Decisions', link: '/dev/decisions' },
+            { text: 'Contributing', link: '/dev/contributing' },
           ],
         },
       ],

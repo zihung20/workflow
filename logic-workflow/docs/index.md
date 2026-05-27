@@ -4,23 +4,26 @@ layout: home
 hero:
   name: logic-workflow
   text: Strongly-typed SOP state machines
-  tagline: Model, execute, and visualize Standard Operating Procedures in TypeScript — with kernel-level reliability.
+  tagline: Build, execute, and visualize workflow state machines in TypeScript — with compile-time safety on every state ID, action name, and payload shape.
   actions:
     - theme: brand
       text: Get Started
-      link: /tutorials/first-workflow
+      link: /guide/
+    - theme: alt
+      text: See Examples
+      link: /examples/
     - theme: alt
       text: API Reference
-      link: /reference/
+      link: /api/
 
 features:
   - icon: 🔒
-    title: Fully type-safe
-    details: Every action name and payload is typed end-to-end. Typos in action names and schema mismatches are caught at compile time.
+    title: Compile-time type safety
+    details: Every state ID, action name, and payload field is checked by TypeScript. Typos and wrong shapes are caught before your code runs.
 
   - icon: ✅
-    title: Zod-validated at every boundary
-    details: Each action payload is validated against its Zod schema before any state transition fires. Runtime surprises are impossible.
+    title: Zod-validated at runtime
+    details: Each action payload is validated against its Zod schema before any transition fires. The same schema drives both the TypeScript type and the runtime check — no duplication.
 
   - icon: 🔀
     title: Parallel branches
@@ -28,13 +31,13 @@ features:
 
   - icon: ⏸️
     title: External wait states
-    details: WaitState pauses the parent workflow until your service layer signals completion. The engine has no I/O coupling whatsoever.
+    details: WaitState pauses the workflow until your service layer signals completion. The engine has no I/O, no polling, no callbacks.
 
   - icon: 💾
     title: Purely functional persistence
-    details: getSnapshot() produces plain JSON. restoreInstance(snapshot) reconstructs exact state. You own the database — we own nothing.
+    details: getSnapshot() produces plain JSON. restoreInstance(snapshot) reconstructs exact state. You own the database — the library owns nothing.
 
   - icon: 📊
     title: Built-in visualization
-    details: Export to Mermaid stateDiagram-v2 or a JSON graph object for D3, React Flow, or Cytoscape — with live status overlays.
+    details: Export to Mermaid stateDiagram-v2 or a JSON graph for React Flow, D3, or Cytoscape — with live status overlays.
 ---

@@ -20,11 +20,11 @@ The fork fires the moment `START` is dispatched — no extra action is needed. B
 
 ```ts
 import { z } from 'zod';
-import { WorkflowBuilder } from 'logic-workflow';
+import { createWorkflow } from 'logic-workflow';
 
-const procurement = new WorkflowBuilder({
+const procurement = createWorkflow({
   name: 'procurement',
-  states: ['start', 'fork', 'legal', 'finance', 'join', 'approved'] as const,
+  states: ['start', 'fork', 'legal', 'finance', 'join', 'approved'],
 })
   .defineAction('START', z.object({}))
   .defineAction('LEGAL_DONE', z.object({ reviewedBy: z.string() }))
@@ -40,10 +40,12 @@ const procurement = new WorkflowBuilder({
 
   .setInitial('start')
   .setTerminal(['approved'])
+
   .addTransition({ from: 'start', to: 'fork', on: 'START' })
   .addTransition({ from: 'legal', to: 'join', on: 'LEGAL_DONE' })
   .addTransition({ from: 'finance', to: 'join', on: 'FINANCE_DONE' })
   .addTransition({ from: 'join', to: 'approved', on: 'FINALIZE' })
+
   .build();
 ```
 
@@ -53,52 +55,52 @@ const procurement = new WorkflowBuilder({
 const inst = procurement.createInstance('prc-001');
 
 await inst.dispatch('START', {});
-// fork: completed  (transient — never stays active)
-// legal: active
-// finance: active
+console.log(inst.getCurrentStates()); // ['legal', 'finance']
+// fork is NOT in getCurrentStates — it completed immediately
 
 await inst.dispatch('LEGAL_DONE', { reviewedBy: 'alice' });
-// legal: completed
-// finance: still active
-// join: idle (threshold not yet met)
+console.log(inst.getCurrentStates()); // ['finance']
 
 await inst.dispatch('FINANCE_DONE', { reviewedBy: 'bob' });
-// finance: completed
-// join: active  ← auto-activated by the fixed-point loop
-// No extra dispatch was needed.
+console.log(inst.getCurrentStates()); // ['join']
+// JoinState activated automatically in the same engine tick
 
 await inst.dispatch('FINALIZE', {});
-// approved: active, isTerminal = true
+console.log(inst.getCurrentStates()); // ['approved']
+console.log(inst.isTerminal());       // true
 ```
 
-## Join modes
+## JoinState modes
 
-`JoinState` supports three threshold modes:
-
-| `mode` value        | Meaning                                                |
-| ------------------- | ------------------------------------------------------ |
-| `'all'` (default)   | Every state in `requires` must complete                |
-| `'any'`             | At least one state in `requires` must complete         |
-| `number` (e.g. `2`) | At least N states in `requires` must complete (quorum) |
+| Mode | Activates when |
+|---|---|
+| `'all'` | Every state in `requires` is completed |
+| `'any'` | At least one state in `requires` is completed |
+| `number N` | At least N states in `requires` are completed |
 
 ```ts
-// Quorum: 2 of 3 reviewers are enough
-builder.addJoin('quorum-join', {
-  requires: ['legal', 'finance', 'compliance'],
-  mode: 2,
-});
+// Quorum: 2 of 3 reviewers sufficient
+.addJoin('join', { requires: ['reviewer-a', 'reviewer-b', 'reviewer-c'], mode: 2 })
 ```
 
-## Nested fork/join
+## ForkState is transient
 
-The engine runs a **fixed-point loop** after each dispatch. It keeps re-evaluating all `JoinState`s until no new activations occur, so nested forks resolve correctly in a single tick without extra dispatches.
+`ForkState` is completed in the same engine tick it is entered. It will never appear in `getCurrentStates()`. Forks are routing nodes — they have no waiting period.
 
-See [Fixed-point engine](/explanation/fixed-point-engine) for a detailed explanation.
+## Chaining forks and joins
 
-## Validation at build time
+Forks and joins can chain. A join can target another fork, which activates in the same fixed-point loop iteration:
 
-`WorkflowBuilder.build()` verifies that every `ForkState` target and every `JoinState` required state is registered. Referencing an unknown ID throws immediately:
-
+```ts
+start ──GO──▶ fork-1 ⑂
+               /       \
+             a           b
+               \       /
+             join-1 ⑁ (all)    ←── activates in the same tick as the last branch
+                │
+             fork-2 ⑂           ←── also fires in that same tick
+               /       \
+             c           d
 ```
-Error: ForkState "fork" references unregistered target "typo"
-```
+
+A single `GO` dispatch resolves the entire chain. See [Fixed-Point Engine](../dev/engine) for the mechanism.
