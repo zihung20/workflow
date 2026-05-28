@@ -2,6 +2,7 @@
   "name": "flowyd",
   "version": "0.1.0",
   "description": "A TypeScript library for defining, executing, and visualizing logic workflows",
+  "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
