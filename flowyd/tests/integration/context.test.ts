@@ -205,7 +205,7 @@ describe('context — persistence', () => {
     // Force-mutate the snapshot's context field
     const mutableCtx = snap.context as { score: number };
     mutableCtx.score = 999;
-    expect(inst.getContext().score).toBe(70);
+    expect(inst.getContext()?.score).toBe(70);
   });
 });
 

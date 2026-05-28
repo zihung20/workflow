@@ -30,8 +30,12 @@ export interface ReadonlyInstanceState {
 
 /**
  * A single entry in the immutable audit trail of a `WorkflowInstance`.
+ *
+ * @template TContext - The instance context type, matching the parent
+ *                      `InstanceSnapshot`. Defaults to `unknown` for
+ *                      type-erased storage (engine, persistence layer).
  */
-export interface HistoryEntry {
+export interface HistoryEntry<TContext = unknown> {
   /** The action name that triggered this transition. */
   readonly action: string;
   /** The Zod-validated payload that was dispatched with the action. */
@@ -40,6 +44,17 @@ export interface HistoryEntry {
   readonly exitedStates: readonly string[];
   /** State IDs that became active, waiting, or were auto-activated as a result. */
   readonly enteredStates: readonly string[];
+  /**
+   * Full state-status map captured immediately after this transition was applied.
+   * Present on all entries written after rewind support was added; absent on
+   * entries from snapshots persisted before that point.
+   */
+  readonly stateStatuses?: Readonly<Record<string, StateStatus>>;
+  /**
+   * Instance context in effect when this transition was dispatched.
+   * Used by `WorkflowInstance.rewind()` to restore context at any past version.
+   */
+  readonly context?: TContext;
   /** ISO-8601 timestamp of when this transition was applied. */
   readonly at: string;
 }
@@ -52,8 +67,12 @@ export interface HistoryEntry {
  * and passed back to `workflow.restoreInstance(snapshot)` to reconstruct a
  * live instance. Guard injections are NOT part of the snapshot — the service
  * layer must re-inject them after restoration.
+ *
+ * @template TContext - The caller-owned context type declared via
+ *                      `WorkflowBuilder.setContext()`. Defaults to `unknown`
+ *                      for type-erased storage sites (engine, visualisation).
  */
-export interface InstanceSnapshot {
+export interface InstanceSnapshot<TContext = unknown> {
   readonly instanceId: string;
   readonly workflowName: string;
   /**
@@ -64,21 +83,24 @@ export interface InstanceSnapshot {
   /** Full status map for every state in the workflow. */
   readonly stateStatuses: Readonly<Record<string, StateStatus>>;
   readonly isTerminal: boolean;
-  readonly history: readonly HistoryEntry[];
+  readonly history: readonly HistoryEntry<TContext>[];
   /**
    * Caller-owned context set via `instance.setContext()`. Persists in the
    * snapshot so it survives `getSnapshot()` / `restoreInstance()` round-trips.
    * `undefined` when no context has been set.
    */
-  readonly context?: unknown;
+  readonly context?: TContext;
   readonly createdAt: string;
   readonly updatedAt: string;
 }
 
 /**
  * Returned by `WorkflowInstance.dispatch()` on a successful state transition.
+ *
+ * @template TContext - Context type of the owning instance. Defaults to `unknown`
+ *                      for the type-erased engine layer.
  */
-export interface TransitionSuccess {
+export interface TransitionSuccess<TContext = unknown> {
   readonly success: true;
   /** The action name that was dispatched. */
   readonly action: string;
@@ -87,7 +109,7 @@ export interface TransitionSuccess {
   /** States that were completed by this transition. */
   readonly exitedStates: readonly string[];
   /** The updated snapshot after the transition has been applied. */
-  readonly snapshot: InstanceSnapshot;
+  readonly snapshot: InstanceSnapshot<TContext>;
 }
 
 /**
@@ -104,5 +126,9 @@ export interface TransitionBlocked {
   readonly activeStates: readonly string[];
 }
 
-/** Discriminated union returned by every `dispatch` call. */
-export type DispatchResult = TransitionSuccess | TransitionBlocked;
+/**
+ * Discriminated union returned by every `dispatch` call.
+ *
+ * @template TContext - Context type of the owning instance. Defaults to `unknown`.
+ */
+export type DispatchResult<TContext = unknown> = TransitionSuccess<TContext> | TransitionBlocked;

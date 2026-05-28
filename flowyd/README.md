@@ -115,7 +115,9 @@ const snapshot = inst.getSnapshot();  // plain JSON — save wherever you want
 - **Parallel branches** — `ForkState` fans out; `JoinState` synchronises (`all` / `any` / quorum)
 - **External wait states** — `WaitState` pauses until `resolveWait` is called
 - **Purely functional persistence** — `getSnapshot()` / `restoreInstance()`, no storage opinions
-- **Typed instance context** — `setContext(schema)` makes context required at `createInstance` time; guards read it via `ctx.context`
+- **Typed instance context** — `setContext(schema)` makes context required at `createInstance` time; guards read it via `ctx.context`; `getContext()` returns `TContext | undefined` with no cast
+- **Fully generic type chain** — `WorkflowDefinition<TContext>`, `InstanceSnapshot<TContext>`, `HistoryEntry<TContext>`, `DispatchResult<TContext>` — context type flows end-to-end with no boundary casts
+- **Rewind** — `instance.rewind(version)` returns an independent deep-cloned `InstanceSnapshot<TContext>` for any past version, with accurate stateStatuses and context
 - **Composable guards** — `Guard.inject`, `Guard.fn`, `Guard.and`, `Guard.or`, `Guard.not`
 - **Built-in visualization** — Mermaid `stateDiagram-v2` and JSON graph for React Flow / D3
 

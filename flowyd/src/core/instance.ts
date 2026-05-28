@@ -44,8 +44,8 @@ export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unkn
 
   /** @internal Created exclusively by `Workflow._createInstance` and `Workflow._restoreInstance`. */
   constructor(
-    private readonly definition: WorkflowDefinition,
-    private snapshot: InstanceSnapshot,
+    private readonly definition: WorkflowDefinition<TContext>,
+    private snapshot: InstanceSnapshot<TContext>,
   ) {}
 
   /**
@@ -77,6 +77,7 @@ export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unkn
    * @returns `this` for chaining.
    */
   setContext(data: TContext): this {
+    // contextSchema is ZodSchema<TContext>, so parse() returns TContext directly.
     const validated = this.definition.contextSchema?.parse(data) ?? data;
     this.snapshot = { ...this.snapshot, context: validated };
     return this;
@@ -85,13 +86,16 @@ export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unkn
   /**
    * Returns the current instance context.
    *
+   * When `setContext()` was called on the builder, `createInstance()` requires
+   * context to be provided, so this will never be `undefined` in practice for
+   * typed workflows. For workflows with no declared context schema the return
+   * type resolves to `unknown`, which subsumes `undefined`.
+   *
    * @returns The context passed to `createInstance()` or last set via
-   *          `setContext()`, or `undefined` if neither has been provided.
+   *          `setContext()`, or `undefined` if neither has been called.
    */
-  getContext(): TContext {
-    // Cast is safe: the snapshot context is always written as TContext via setContext
-    // and initialContext, both of which are constrained at the builder level.
-    return this.snapshot.context as TContext;
+  getContext(): TContext | undefined {
+    return this.snapshot.context;
   }
 
   // ─── Query ────────────────────────────────────────────────────────────────
@@ -188,7 +192,7 @@ export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unkn
   async dispatch<K extends keyof TActions & string, P extends TActions[K]>(
     action: K,
     payload: Exact<TActions[K], P>,
-  ): Promise<DispatchResult>;
+  ): Promise<DispatchResult<TContext>>;
 
   /**
    * @internal Overload used by `canExecute` to perform a dry-run without
@@ -198,13 +202,13 @@ export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unkn
     action: K,
     payload: TActions[K],
     dryRun: boolean,
-  ): Promise<DispatchResult>;
+  ): Promise<DispatchResult<TContext>>;
 
   async dispatch<K extends keyof TActions & string>(
     action: K,
     payload: TActions[K],
     dryRun = false,
-  ): Promise<DispatchResult> {
+  ): Promise<DispatchResult<TContext>> {
     const schema = this.definition.actionSchemas.get(action);
     if (!schema) {
       throw new Error(`Action "${action}" is not registered in workflow "${this.definition.name}"`);
@@ -228,8 +232,6 @@ export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unkn
 
     return result;
   }
-
-  // ─── Wait resolution ──────────────────────────────────────────────────────
 
   /**
    * Signals that an external process has completed, promoting the corresponding
@@ -262,12 +264,15 @@ export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unkn
       [stateId]: StateStatus.Active,
     };
 
-    const historyEntry: HistoryEntry = {
+    const ctx = this.snapshot.context;
+    const historyEntry: HistoryEntry<TContext> = {
       action: `__resolve_wait:${stateId}`,
       payload: externalSnapshot ?? null,
       exitedStates: [],
       enteredStates: [stateId],
+      stateStatuses: updatedStatuses,
       at: new Date().toISOString(),
+      ...(ctx !== undefined && { context: ctx }),
     };
 
     this.snapshot = {
@@ -279,18 +284,109 @@ export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unkn
     };
   }
 
-  // ─── Persistence ──────────────────────────────────────────────────────────
-
   /**
    * Returns a plain, JSON-serialisable snapshot of the current instance state.
    *
    * Safe to `JSON.stringify` and write to any persistence layer. The returned
    * object is a deep clone — mutations do not affect the live instance.
    *
-   * @returns An `InstanceSnapshot` capturing the full current state.
+   * @returns An `InstanceSnapshot<TContext>` capturing the full current state.
    */
-  getSnapshot(): InstanceSnapshot {
+  getSnapshot(): InstanceSnapshot<TContext> {
     return structuredClone(this.snapshot);
+  }
+
+  /**
+   * Returns an independent deep-cloned snapshot of what the instance looked like
+   * at the given version. Mutations to the returned object do not affect the live
+   * instance.
+   *
+   * **Context accuracy**: each history entry records the context that was active
+   * at the time of the corresponding dispatch, so `rewind(N).context` reflects
+   * the exact context that guards saw when transitioning to version N. For
+   * version 0, context reflects whatever was set before the first dispatch
+   * (captured in `history[0].context`); if no dispatches have occurred yet,
+   * the current context is used.
+   *
+   * @param version - An integer in `[0, currentVersion]`. `0` is the initial
+   *                  state before any dispatches; passing the current version is
+   *                  equivalent to calling `getSnapshot()`.
+   * @returns A complete `InstanceSnapshot<TContext>` for the requested version.
+   * @throws {Error} If `version` is outside `[0, currentVersion]`.
+   * @throws {Error} If a required history entry has no `stateStatuses` record,
+   *                 meaning the snapshot predates rewind support.
+   */
+  rewind(version: number): InstanceSnapshot<TContext> {
+    const current = this.snapshot.version;
+    if (version < 0 || version > current) {
+      throw new Error(
+        `Version ${version} is out of range. Expected a value between 0 and ${current}.`,
+      );
+    }
+
+    if (version === current) {
+      return this.getSnapshot();
+    }
+
+    if (version === 0) {
+      const stateStatuses: Record<string, StateStatus> = {};
+      for (const id of this.definition.states.keys()) {
+        stateStatuses[id] = StateStatus.Idle;
+      }
+      stateStatuses[this.definition.initialStateId] = StateStatus.Active;
+
+      // Use context from the first history entry if it exists (captures what was
+      // set before the first dispatch), otherwise fall back to the current context.
+      const contextAtV0 = this.snapshot.history[0]?.context ?? this.snapshot.context;
+
+      const base: InstanceSnapshot<TContext> = {
+        instanceId: this.snapshot.instanceId,
+        workflowName: this.snapshot.workflowName,
+        version: 0,
+        stateStatuses,
+        isTerminal: false,
+        history: [],
+        createdAt: this.snapshot.createdAt,
+        updatedAt: this.snapshot.createdAt,
+      };
+      const result: InstanceSnapshot<TContext> =
+        contextAtV0 !== undefined ? { ...base, context: contextAtV0 } : base;
+      return structuredClone(result);
+    }
+
+    const entry = this.snapshot.history[version - 1];
+    if (entry === undefined) {
+      throw new Error(`Internal: no history entry at index ${version - 1}`);
+    }
+    const { stateStatuses } = entry;
+    if (stateStatuses === undefined) {
+      throw new Error(
+        `Cannot rewind to version ${version}: history entry has no stateStatuses. ` +
+          `The snapshot may predate rewind support.`,
+      );
+    }
+
+    const isTerminal = this.definition.terminalStateIds.some(
+      (id) => stateStatuses[id] === StateStatus.Active,
+    );
+
+    // Context at version N is what was in effect when dispatch N fired, recorded in
+    // history[N-1].context. Falls back to current context for pre-rewind-support snapshots.
+    const contextAtN = entry.context ?? this.snapshot.context;
+
+    const base: InstanceSnapshot<TContext> = {
+      instanceId: this.snapshot.instanceId,
+      workflowName: this.snapshot.workflowName,
+      version,
+      stateStatuses,
+      isTerminal,
+      history: this.snapshot.history.slice(0, version),
+      createdAt: this.snapshot.createdAt,
+      updatedAt: entry.at,
+    };
+    const result: InstanceSnapshot<TContext> =
+      contextAtN !== undefined ? { ...base, context: contextAtN } : base;
+    return structuredClone(result);
   }
 
   // ─── Internal helpers ─────────────────────────────────────────────────────

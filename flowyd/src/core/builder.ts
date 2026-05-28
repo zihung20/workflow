@@ -357,14 +357,19 @@ export class WorkflowBuilder<
       }
     }
 
-    const definition: WorkflowDefinition = {
+    // contextSchema is stored as ZodSchema<unknown> because the builder accumulates
+    // TContext via setContext<C>() which casts `this` to a new type. At build() time
+    // TContext is sealed, so casting the stored schema to ZodSchema<TContext> is safe.
+    const definition: WorkflowDefinition<TContext> = {
       name: this.name,
       states,
       transitions: [...this.transitions],
       actionSchemas: new Map(this.actionSchemas),
       initialStateId: this.initialStateId,
       terminalStateIds: [...this.terminalStateIds],
-      ...(this.contextSchema !== undefined && { contextSchema: this.contextSchema }),
+      ...(this.contextSchema !== undefined && {
+        contextSchema: this.contextSchema as ZodSchema<TContext>,
+      }),
     };
 
     return new Workflow<TActions, TContext>(definition);

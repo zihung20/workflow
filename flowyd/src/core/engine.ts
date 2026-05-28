@@ -40,6 +40,10 @@ export class WorkflowEngine {
   /**
    * Evaluates a dispatched action against the current instance state.
    *
+   * `TContext` is inferred from `currentSnapshot` so the returned snapshot and
+   * history entries carry the same context type as the caller's snapshot — no
+   * cast required when assigning the result back to a typed `WorkflowInstance`.
+   *
    * @param definition      - The immutable compiled workflow graph.
    * @param instanceState   - Read-only view of the current instance state.
    * @param guardRegistry   - The instance's registered guard functions.
@@ -47,20 +51,20 @@ export class WorkflowEngine {
    * @param action          - The action name being dispatched.
    * @param payload         - The Zod-validated action payload.
    * @param context         - The accumulated instance context, passed through to guards.
-   * @returns A `DispatchResult` discriminated union. On success, includes the
+   * @returns A `DispatchResult<TContext>` discriminated union. On success, includes the
    *          updated snapshot and lists of entered/exited states.
    * @throws Any error thrown by a guard's `evaluate()` method — guard errors
    *         are not caught by the engine and propagate directly to the caller.
    */
-  static async dispatch(
+  static async dispatch<TContext>(
     definition: WorkflowDefinition,
     instanceState: ReadonlyInstanceState,
     guardRegistry: GuardRegistry,
-    currentSnapshot: InstanceSnapshot,
+    currentSnapshot: InstanceSnapshot<TContext>,
     action: string,
     payload: unknown,
-    context: unknown,
-  ): Promise<DispatchResult> {
+    context: TContext | undefined,
+  ): Promise<DispatchResult<TContext>> {
     if (currentSnapshot.isTerminal) {
       return {
         success: false,
@@ -113,20 +117,24 @@ export class WorkflowEngine {
       (id) => result.newStatuses.get(id) === StateStatus.Active,
     );
 
-    const historyEntry: HistoryEntry = {
-      action,
-      payload,
-      exitedStates: result.exitedStates,
-      enteredStates: result.enteredStates,
-      at: new Date().toISOString(),
-    };
-
     const updatedStatuses: Record<string, StateStatus> = {};
     for (const [id, status] of result.newStatuses) {
       updatedStatuses[id] = status;
     }
 
-    const updatedSnapshot: InstanceSnapshot = {
+    // Conditional spread satisfies exactOptionalPropertyTypes: context?: TContext
+    // disallows explicit undefined, so we only include the field when it is set.
+    const historyEntry: HistoryEntry<TContext> = {
+      action,
+      payload,
+      exitedStates: result.exitedStates,
+      enteredStates: result.enteredStates,
+      stateStatuses: updatedStatuses,
+      at: new Date().toISOString(),
+      ...(context !== undefined && { context }),
+    };
+
+    const updatedSnapshot: InstanceSnapshot<TContext> = {
       ...currentSnapshot,
       version: currentSnapshot.version + 1,
       stateStatuses: updatedStatuses,

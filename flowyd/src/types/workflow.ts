@@ -9,14 +9,18 @@ import type { TransitionDefinition } from './transition.js';
 export type ActionPayloadMap = Record<string, unknown>;
 
 /**
- * Internal, type-erased representation of a compiled workflow.
+ * Compiled, immutable representation of a workflow definition.
  *
- * This is the structure the engine and visualisation layer operate against.
- * It carries no generic type parameters — those live on `Workflow<TActions>`
- * and `WorkflowInstance<TActions>` in the core layer where user-facing type
- * safety is enforced.
+ * The engine and visualisation layer use the default `WorkflowDefinition`
+ * (= `WorkflowDefinition<unknown>`) which is effectively type-erased.
+ * `Workflow<TActions, TContext>` and `WorkflowInstance<TActions, TContext>`
+ * hold `WorkflowDefinition<TContext>` so that `contextSchema.parse()` returns
+ * `TContext` directly rather than `unknown`, removing the need for boundary casts.
+ *
+ * @template TContext - Context type declared via `WorkflowBuilder.setContext()`.
+ *                      Defaults to `unknown` for the type-erased engine/vis layer.
  */
-export interface WorkflowDefinition {
+export interface WorkflowDefinition<TContext = unknown> {
   readonly name: string;
 
   /** All states in the graph, keyed by state ID. */
@@ -42,8 +46,8 @@ export interface WorkflowDefinition {
 
   /**
    * Zod schema for the instance context declared via `WorkflowBuilder.setContext()`.
-   * Used to validate context values at `createInstance` and `instance.setContext()`.
+   * Typed as `ZodSchema<TContext>` so `.parse()` returns `TContext` without a cast.
    * `undefined` when no context schema was declared.
    */
-  readonly contextSchema?: ZodSchema<unknown>;
+  readonly contextSchema?: ZodSchema<TContext>;
 }

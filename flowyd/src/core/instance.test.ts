@@ -158,6 +158,119 @@ describe('WorkflowInstance — resolveWait', () => {
   });
 });
 
+function makeThreeStep() {
+  return createWorkflow({ name: 'three-step' })
+    .defineAction('NEXT', Empty)
+    .addStep('a')
+    .addStep('b')
+    .addStep('c')
+    .setInitial('a')
+    .setTerminal(['c'])
+    .addTransition({ from: 'a', to: 'b', on: 'NEXT' })
+    .addTransition({ from: 'b', to: 'c', on: 'NEXT' })
+    .build();
+}
+
+describe('WorkflowInstance — rewind', () => {
+  it('rewind(0) returns the initial state before any dispatches', async () => {
+    const wf = makeLinear();
+    const inst = wf.createInstance('rw-001');
+    await inst.dispatch('GO', {});
+    const rewound = inst.rewind(0);
+    expect(rewound.version).toBe(0);
+    expect(rewound.stateStatuses['a']).toBe(StateStatus.Active);
+    expect(rewound.stateStatuses['b']).toBe(StateStatus.Idle);
+    expect(rewound.isTerminal).toBe(false);
+    expect(rewound.history).toHaveLength(0);
+  });
+
+  it('rewind(currentVersion) returns the same content as getSnapshot()', async () => {
+    const wf = makeLinear();
+    const inst = wf.createInstance('rw-002');
+    await inst.dispatch('GO', {});
+    expect(inst.rewind(1)).toEqual(inst.getSnapshot());
+  });
+
+  it('rewind(N) returns stateStatuses at version N', async () => {
+    const wf = makeThreeStep();
+    const inst = wf.createInstance('rw-003');
+    await inst.dispatch('NEXT', {});
+    await inst.dispatch('NEXT', {});
+
+    const at1 = inst.rewind(1);
+    expect(at1.version).toBe(1);
+    expect(at1.stateStatuses['a']).toBe(StateStatus.Completed);
+    expect(at1.stateStatuses['b']).toBe(StateStatus.Active);
+    expect(at1.stateStatuses['c']).toBe(StateStatus.Idle);
+    expect(at1.isTerminal).toBe(false);
+    expect(at1.history).toHaveLength(1);
+  });
+
+  it('rewind(N) marks isTerminal correctly for terminal versions', async () => {
+    const wf = makeThreeStep();
+    const inst = wf.createInstance('rw-004');
+    await inst.dispatch('NEXT', {});
+    await inst.dispatch('NEXT', {});
+
+    const at2 = inst.rewind(2);
+    expect(at2.isTerminal).toBe(true);
+    expect(at2.stateStatuses['c']).toBe(StateStatus.Active);
+  });
+
+  it('returned snapshot is a deep clone — mutations do not affect the live instance', async () => {
+    const wf = makeLinear();
+    const inst = wf.createInstance('rw-005');
+    await inst.dispatch('GO', {});
+    const rewound = inst.rewind(0);
+    (rewound.stateStatuses as Record<string, StateStatus>)['a'] = StateStatus.Idle;
+    expect(inst.getStateStatus('a')).toBe(StateStatus.Completed);
+  });
+
+  it('two calls to rewind(N) return equal but distinct objects', async () => {
+    const wf = makeLinear();
+    const inst = wf.createInstance('rw-006');
+    await inst.dispatch('GO', {});
+    const r1 = inst.rewind(0);
+    const r2 = inst.rewind(0);
+    expect(r1).toEqual(r2);
+    expect(r1).not.toBe(r2);
+  });
+
+  it('throws for version below 0', () => {
+    const wf = makeLinear();
+    const inst = wf.createInstance('rw-007');
+    expect(() => inst.rewind(-1)).toThrow('out of range');
+  });
+
+  it('throws for version above currentVersion', () => {
+    const wf = makeLinear();
+    const inst = wf.createInstance('rw-008');
+    expect(() => inst.rewind(1)).toThrow('out of range');
+  });
+
+  it('rewind records context at each version', async () => {
+    const wf = createWorkflow({ name: 'ctx-rw' })
+      .setContext(z.object({ step: z.number() }))
+      .defineAction('GO', Empty)
+      .addStep('a')
+      .addStep('b')
+      .addStep('c')
+      .setInitial('a')
+      .setTerminal(['c'])
+      .addTransition({ from: 'a', to: 'b', on: 'GO' })
+      .addTransition({ from: 'b', to: 'c', on: 'GO' })
+      .build();
+
+    const inst = wf.createInstance('rw-ctx-001', { step: 1 });
+    await inst.dispatch('GO', {});           // version 1, context was { step: 1 }
+    inst.setContext({ step: 2 });
+    await inst.dispatch('GO', {});           // version 2, context was { step: 2 }
+
+    expect(inst.rewind(1).context).toEqual({ step: 1 });
+    expect(inst.rewind(2).context).toEqual({ step: 2 });
+  });
+});
+
 describe('WorkflowInstance — payload strictness', () => {
   // Type-only tests: the async helpers below are never called at runtime.
   // TypeScript still checks their bodies, so unused @ts-expect-error directives

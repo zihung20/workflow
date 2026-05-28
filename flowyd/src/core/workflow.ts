@@ -1,4 +1,4 @@
-import type { WorkflowDefinition, ActionPayloadMap, InstanceSnapshot } from '../types/index.js';
+import type { WorkflowDefinition, ActionPayloadMap, InstanceSnapshot, HistoryEntry } from '../types/index.js';
 import { StateStatus } from '../types/index.js';
 import { WorkflowInstance } from './instance.js';
 
@@ -17,7 +17,7 @@ import { WorkflowInstance } from './instance.js';
  */
 export class Workflow<TActions extends ActionPayloadMap, TContext = unknown> {
   /** @internal */
-  constructor(private readonly definition: WorkflowDefinition) {}
+  constructor(private readonly definition: WorkflowDefinition<TContext>) {}
 
   /**
    * Creates a fresh `WorkflowInstance` with the initial state active and no
@@ -47,21 +47,26 @@ export class Workflow<TActions extends ActionPayloadMap, TContext = unknown> {
     // Conditional rest params collapse to TContext | undefined at runtime; the
     // overload signature enforces presence when TContext is concrete.
     const context = (args as [TContext | undefined])[0];
+    // contextSchema is ZodSchema<TContext>, so parse() returns TContext directly.
     const validatedContext = context !== undefined
       ? this.definition.contextSchema?.parse(context) ?? context
       : undefined;
 
-    const snapshot: InstanceSnapshot = {
+    const snapshotBase: InstanceSnapshot<TContext> = {
       instanceId,
       workflowName: this.definition.name,
       version: 0,
       stateStatuses,
       isTerminal: false,
       history: [],
-      context: validatedContext,
       createdAt: now,
       updatedAt: now,
     };
+    // Conditionally include context to satisfy exactOptionalPropertyTypes:
+    // context?: TContext does not allow explicit `undefined` when TContext is concrete.
+    const snapshot: InstanceSnapshot<TContext> = validatedContext !== undefined
+      ? { ...snapshotBase, context: validatedContext }
+      : snapshotBase;
 
     return new WorkflowInstance<TActions, TContext>(this.definition, snapshot);
   }
@@ -78,7 +83,7 @@ export class Workflow<TActions extends ActionPayloadMap, TContext = unknown> {
    * @returns A `WorkflowInstance<TActions, TContext>` in the exact state captured by the snapshot.
    * @throws {Error} If the snapshot's `workflowName` does not match this definition.
    */
-  restoreInstance(snapshot: InstanceSnapshot): WorkflowInstance<TActions, TContext> {
+  restoreInstance(snapshot: InstanceSnapshot<TContext>): WorkflowInstance<TActions, TContext> {
     if (snapshot.workflowName !== this.definition.name) {
       throw new Error(
         `Cannot restore snapshot: workflow name mismatch. ` +
@@ -89,7 +94,7 @@ export class Workflow<TActions extends ActionPayloadMap, TContext = unknown> {
   }
 
   /** Returns the underlying definition for use by visualisation exporters. */
-  getDefinition(): WorkflowDefinition {
+  getDefinition(): WorkflowDefinition<TContext> {
     return this.definition;
   }
 }
