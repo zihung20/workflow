@@ -99,7 +99,11 @@ export interface InstanceSnapshot<TContext = unknown, TStates extends string = s
  * @template TAction  - The specific action name that was dispatched. Defaults to
  *                      `string` for the type-erased engine layer.
  */
-export interface TransitionSuccess<TContext = unknown, TStates extends string = string, TAction extends string = string> {
+export interface TransitionSuccess<
+  TContext = unknown,
+  TStates extends string = string,
+  TAction extends string = string,
+> {
   readonly success: true;
   /** The action name that was dispatched. */
   readonly action: TAction;
@@ -120,7 +124,10 @@ export interface TransitionSuccess<TContext = unknown, TStates extends string = 
  * @template TAction  - The specific action name that was dispatched. Defaults to
  *                      `string` for the type-erased engine layer.
  */
-export interface TransitionBlocked<TStates extends string = string, TAction extends string = string> {
+export interface TransitionBlocked<
+  TStates extends string = string,
+  TAction extends string = string,
+> {
   readonly success: false;
   /** The action name that was dispatched. */
   readonly action: TAction;
@@ -141,6 +148,8 @@ export interface TransitionBlocked<TStates extends string = string, TAction exte
  * @template TAction  - The specific action name that was dispatched. Defaults to
  *                      `string` for the type-erased engine layer.
  */
-export type DispatchResult<TContext = unknown, TStates extends string = string, TAction extends string = string> =
-  | TransitionSuccess<TContext, TStates, TAction>
-  | TransitionBlocked<TStates, TAction>;
+export type DispatchResult<
+  TContext = unknown,
+  TStates extends string = string,
+  TAction extends string = string,
+> = TransitionSuccess<TContext, TStates, TAction> | TransitionBlocked<TStates, TAction>;

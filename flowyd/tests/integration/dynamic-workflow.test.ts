@@ -81,7 +81,9 @@ describe('createDynamicWorkflow factory', () => {
     const ids: string[] = ['alpha', 'beta', 'gamma'];
     const builder = createDynamicWorkflow({ name: 'no-cast' });
     builder.defineAction('NEXT', z.object({}));
-    for (const id of ids) { builder.addStep(id); }
+    for (const id of ids) {
+      builder.addStep(id);
+    }
     builder.setInitial(ids[0]!).setTerminal([ids[2]!]);
     builder.addTransition({ from: 'alpha', to: 'beta', on: 'NEXT' });
     builder.addTransition({ from: 'beta', to: 'gamma', on: 'NEXT' });
@@ -92,7 +94,9 @@ describe('createDynamicWorkflow factory', () => {
     const waitIds = ['wait-a', 'wait-b'];
     const builder = createDynamicWorkflow({ name: 'dynamic-waits' });
     builder.defineAction('RESUME', z.object({}));
-    for (const id of waitIds) { builder.addWait(id, { externalName: id }); }
+    for (const id of waitIds) {
+      builder.addWait(id, { externalName: id });
+    }
     builder.setInitial('wait-a').setTerminal(['wait-b']);
     builder.addTransition({ from: 'wait-a', to: 'wait-b', on: 'RESUME' });
     expect(() => builder.build()).not.toThrow();

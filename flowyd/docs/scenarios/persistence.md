@@ -8,11 +8,11 @@
 interface InstanceSnapshot {
   instanceId: string;
   workflowName: string;
-  version: number;          // increments on every successful dispatch or resolveWait
+  version: number; // increments on every successful dispatch or resolveWait
   stateStatuses: Readonly<Record<string, 'idle' | 'active' | 'waiting' | 'completed'>>;
   isTerminal: boolean;
   history: readonly HistoryEntry[];
-  createdAt: string;        // ISO 8601
+  createdAt: string; // ISO 8601
   updatedAt: string;
 }
 ```
@@ -90,8 +90,8 @@ inst.injectGuard('isManager', myGuardFn);
 
 ```ts
 interface HistoryEntry {
-  action: string;      // action name, or '__resolve_wait:<stateId>' for resolveWait calls
-  timestamp: string;   // ISO 8601
+  action: string; // action name, or '__resolve_wait:<stateId>' for resolveWait calls
+  timestamp: string; // ISO 8601
   enteredStates: string[];
   exitedStates: string[];
 }

@@ -37,7 +37,9 @@
       "Bash(sed -i '' 's|logic-workflow|flowyd|g' /Users/zihung20/Desktop/workflow/CLAUDE.md)",
       "Bash(pnpm test:integration *)",
       "Bash(npx license-checker *)",
-      "Bash(pnpm test:perf *)"
+      "Bash(pnpm test:perf *)",
+      "Bash(printf 'pnpm test:perf\\\\n')",
+      "Bash(chmod +x /Users/zihung20/Desktop/workflow/flowyd/.husky/pre-commit)"
     ]
   }
 }

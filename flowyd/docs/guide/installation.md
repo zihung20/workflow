@@ -84,7 +84,7 @@ await inst.dispatch('SUBMIT', { submitterId: 'alice' });
 await inst.dispatch('APPROVE', { approverId: 'mgr-1', reason: 'Looks good' });
 
 console.log(inst.getCurrentStates()); // ['approved']
-console.log(inst.isTerminal());       // true
+console.log(inst.isTerminal()); // true
 
 // Persist
 const snapshot = inst.getSnapshot();

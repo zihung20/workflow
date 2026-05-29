@@ -2,7 +2,6 @@
 
 A workflow is a directed graph of **states** connected by **transitions**. The **engine** advances the graph when you dispatch an **action**. The result is a **snapshot** — a plain JSON object you can store anywhere.
 
-
 ## States
 
 Every node in the graph is a state. There are four kinds.
@@ -23,7 +22,6 @@ draft ──SUBMIT──▶ review ──APPROVE──▶ approved
 
 **Use when:** the workflow is paused at this node waiting for a human or system action.
 
-
 ### ForkState — fan out to parallel branches
 
 A `ForkState` is a routing node. The moment it is entered, it immediately activates all its `targets` and marks itself `completed`. It is never left in the `active` status — it is transient by design.
@@ -39,7 +37,6 @@ briefed ──▶ fork ┤
 ```
 
 **Use when:** multiple steps must run concurrently and independently.
-
 
 ### JoinState — synchronise parallel branches
 
@@ -58,14 +55,13 @@ finance-review ──┘
 })
 ```
 
-| Mode | Activates when |
-|---|---|
-| `'all'` | Every state in `requires` is `completed` |
-| `'any'` | At least one state in `requires` is `completed` |
+| Mode       | Activates when                                  |
+| ---------- | ----------------------------------------------- |
+| `'all'`    | Every state in `requires` is `completed`        |
+| `'any'`    | At least one state in `requires` is `completed` |
 | `number N` | At least N states in `requires` are `completed` |
 
 **Use when:** you need to re-synchronise after a `ForkState`.
-
 
 ### WaitState — pause for an external signal
 
@@ -82,7 +78,6 @@ order-placed ──SUBMIT──▶ payment-processing ⤴ ──PAYMENT_OK──
 
 **Use when:** the workflow must wait for an external system — a webhook, a background job, a human approval in another system — before it can continue.
 
-
 ## Transitions
 
 A transition is a directed edge from one state to another, fired when a specific action is dispatched.
@@ -94,11 +89,11 @@ A transition is a directed edge from one state to another, fired when a specific
 ```
 
 Every transition has:
+
 - `from` — the source state (must be `active` for the transition to fire)
 - `to` — the destination state
 - `on` — the action name that triggers it
-- `guard` *(optional)* — a predicate that must return `true` for the transition to fire
-
+- `guard` _(optional)_ — a predicate that must return `true` for the transition to fire
 
 ## Actions
 
@@ -110,7 +105,6 @@ An action is a named event with a typed payload. You define actions with `define
 ```
 
 Zod schema → TypeScript type automatically. You never write the type separately.
-
 
 ## Guards
 
@@ -144,7 +138,6 @@ inst.injectGuard('isManager', async (ctx) => {
 
 Guards are **not persisted** in snapshots — re-inject them after every `restoreInstance`.
 
-
 ## Snapshots
 
 A snapshot is a plain JSON object that captures the complete state of a running workflow instance.
@@ -153,11 +146,11 @@ A snapshot is a plain JSON object that captures the complete state of a running 
 interface InstanceSnapshot {
   instanceId: string;
   workflowName: string;
-  version: number;          // increments on every successful dispatch or resolveWait
+  version: number; // increments on every successful dispatch or resolveWait
   stateStatuses: Record<string, 'idle' | 'active' | 'waiting' | 'completed'>;
   isTerminal: boolean;
-  history: HistoryEntry[];  // append-only audit log
-  createdAt: string;        // ISO 8601
+  history: HistoryEntry[]; // append-only audit log
+  createdAt: string; // ISO 8601
   updatedAt: string;
 }
 ```
@@ -175,16 +168,15 @@ const inst = workflow.restoreInstance(snap);
 inst.injectGuard('isManager', myGuardFn); // re-inject guards
 ```
 
-
 ## State statuses
 
 Every state moves through a fixed progression:
 
-| Status | Meaning |
-|---|---|
-| `idle` | Not yet entered |
-| `active` | Currently active — awaiting a dispatch |
-| `waiting` | `WaitState` only — paused until `resolveWait` is called |
-| `completed` | Exited; will not become active again |
+| Status      | Meaning                                                 |
+| ----------- | ------------------------------------------------------- |
+| `idle`      | Not yet entered                                         |
+| `active`    | Currently active — awaiting a dispatch                  |
+| `waiting`   | `WaitState` only — paused until `resolveWait` is called |
+| `completed` | Exited; will not become active again                    |
 
 States only move forward. The engine never reverses a status.

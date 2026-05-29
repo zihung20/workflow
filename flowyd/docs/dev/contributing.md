@@ -2,10 +2,10 @@
 
 ## Prerequisites
 
-| Tool | Version |
-|---|---|
-| Node.js | ≥ 20 |
-| pnpm | ≥ 9 |
+| Tool    | Version |
+| ------- | ------- |
+| Node.js | ≥ 20    |
+| pnpm    | ≥ 9     |
 
 Install pnpm if you don't have it:
 
@@ -97,17 +97,23 @@ Functions that can fail throw a typed error. No silent `catch` blocks:
 
 ```ts
 // Correct
-try { result = await doWork(); }
-catch (err) { throw new WorkflowExecutionError('failed', { cause: err }); }
+try {
+  result = await doWork();
+} catch (err) {
+  throw new WorkflowExecutionError('failed', { cause: err });
+}
 
 // Never
-try { result = await doWork(); }
-catch { result = defaultValue; }
+try {
+  result = await doWork();
+} catch {
+  result = defaultValue;
+}
 ```
 
 ### Comments
 
-Write a comment only when the *why* would surprise an informed reader. Never explain what the code does — rename the identifier instead.
+Write a comment only when the _why_ would surprise an informed reader. Never explain what the code does — rename the identifier instead.
 
 ### TSDoc
 
@@ -115,11 +121,11 @@ Every exported symbol needs a TSDoc block with a one-sentence description, `@par
 
 ## Test structure
 
-| Project | Glob | Purpose |
-|---|---|---|
-| `unit` | `src/**/*.test.ts` | Co-located unit tests |
-| `integration` | `tests/integration/**/*.test.ts` | Multi-component flows |
-| `e2e` | `tests/e2e/**/*.test.ts` | Full workflow invariants |
+| Project       | Glob                             | Purpose                  |
+| ------------- | -------------------------------- | ------------------------ |
+| `unit`        | `src/**/*.test.ts`               | Co-located unit tests    |
+| `integration` | `tests/integration/**/*.test.ts` | Multi-component flows    |
+| `e2e`         | `tests/e2e/**/*.test.ts`         | Full workflow invariants |
 
 `tests/helpers.ts` — shared `makeCtx` fixture used by guard unit tests.
 

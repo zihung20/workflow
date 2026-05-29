@@ -483,22 +483,32 @@ addStep<K extends string>(id: K, options: { label?: string } = {}): WorkflowBuil
 Since `addFork.targets` is typed `[TStates, ...TStates[]]`, TypeScript requires that every target state is already registered at the point `addFork` is called. This means **branch states must be declared before the fork or join that references them**.
 
 **Before (Config-First — any order, states array as the source of truth):**
+
 ```ts
 createWorkflow({
   name: 'predeparture',
-  states: ['reported-for-duty', 'briefed', 'inspection-fork',
-           'mechanical', 'electrical', 'safety-systems',
-           'inspections-joined', 'signed-off', 'departed'],
+  states: [
+    'reported-for-duty',
+    'briefed',
+    'inspection-fork',
+    'mechanical',
+    'electrical',
+    'safety-systems',
+    'inspections-joined',
+    'signed-off',
+    'departed',
+  ],
 })
   .addFork('inspection-fork', {
-    targets: ['mechanical', 'electrical', 'safety-systems'],  // forward ref — OK because states array
+    targets: ['mechanical', 'electrical', 'safety-systems'], // forward ref — OK because states array
   })
   .addStep('mechanical')
   .addStep('electrical')
-  .addStep('safety-systems')
+  .addStep('safety-systems');
 ```
 
 **After (no states array — branches must precede fork):**
+
 ```ts
 createWorkflow({ name: 'predeparture' })
   .addStep('reported-for-duty')
@@ -520,15 +530,19 @@ createWorkflow({ name: 'predeparture' })
   .addStep('departed')
   .setInitial('reported-for-duty')
   .setTerminal(['departed'])
-  .addTransition({ from: 'reported-for-duty', to: 'briefed',        on: 'BRIEFING_RECEIVED' })
-  .addTransition({ from: 'briefed',           to: 'inspection-fork', on: 'START_INSPECTION' })
-  .addTransition({ from: 'mechanical',        to: 'inspections-joined', on: 'MECH_OK' })
-  .addTransition({ from: 'electrical',        to: 'inspections-joined', on: 'ELEC_OK' })
-  .addTransition({ from: 'safety-systems',    to: 'inspections-joined', on: 'SAFETY_OK' })
-  .addTransition({ from: 'inspections-joined', to: 'signed-off',    on: 'SIGN_OFF',
-    guard: (ctx) => ctx.payload.certifies === true })
-  .addTransition({ from: 'signed-off',        to: 'departed',       on: 'DEPART' })
-  .build()
+  .addTransition({ from: 'reported-for-duty', to: 'briefed', on: 'BRIEFING_RECEIVED' })
+  .addTransition({ from: 'briefed', to: 'inspection-fork', on: 'START_INSPECTION' })
+  .addTransition({ from: 'mechanical', to: 'inspections-joined', on: 'MECH_OK' })
+  .addTransition({ from: 'electrical', to: 'inspections-joined', on: 'ELEC_OK' })
+  .addTransition({ from: 'safety-systems', to: 'inspections-joined', on: 'SAFETY_OK' })
+  .addTransition({
+    from: 'inspections-joined',
+    to: 'signed-off',
+    on: 'SIGN_OFF',
+    guard: (ctx) => ctx.payload.certifies === true,
+  })
+  .addTransition({ from: 'signed-off', to: 'departed', on: 'DEPART' })
+  .build();
 ```
 
 The call order changes slightly — branches before fork, prerequisites before join — but this is a natural "declare before use" discipline that TypeScript now enforces. Violating it produces a compile error at the `targets`/`requires` array, not a silent runtime failure at `build()`.
@@ -537,17 +551,17 @@ The call order changes slightly — branches before fork, prerequisites before j
 
 ### What changes
 
-| Location | Change |
-|---|---|
-| `src/core/builder.ts` | Constructor: remove `states` from config type. `addStep`/`addFork`/`addJoin`/`addWait`: change return type from `this` to `WorkflowBuilder<TActions, TStates \| K>`; add `as unknown as` cast at return site. |
-| `src/core/builder.ts` | `createWorkflow`: remove `const TStates` parameter and `states` from config type. New signature: `(config: { name: string }) => WorkflowBuilder<Record<never,never>, never>`. |
-| `examples/*.ts` (4 files) | Remove `states: [...]` from `createWorkflow` call. Reorder `addFork`/`addJoin` to appear after their branch/prerequisite states. |
-| `tests/integration/**` | Same — remove states array, reorder as needed. |
-| `tests/e2e/**` | Same. |
-| `src/core/builder.test.ts` | Same. |
-| `CLAUDE.md` | Update Section 3 "Config-First WorkflowBuilder" to describe the new "Accumulating Builder" pattern; add version entry to Section 5. |
-| `README.md` | Update quick-start snippet. |
-| `docs/` | Update all code blocks that show `createWorkflow({ states: [...] })`. |
+| Location                   | Change                                                                                                                                                                                                        |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/core/builder.ts`      | Constructor: remove `states` from config type. `addStep`/`addFork`/`addJoin`/`addWait`: change return type from `this` to `WorkflowBuilder<TActions, TStates \| K>`; add `as unknown as` cast at return site. |
+| `src/core/builder.ts`      | `createWorkflow`: remove `const TStates` parameter and `states` from config type. New signature: `(config: { name: string }) => WorkflowBuilder<Record<never,never>, never>`.                                 |
+| `examples/*.ts` (4 files)  | Remove `states: [...]` from `createWorkflow` call. Reorder `addFork`/`addJoin` to appear after their branch/prerequisite states.                                                                              |
+| `tests/integration/**`     | Same — remove states array, reorder as needed.                                                                                                                                                                |
+| `tests/e2e/**`             | Same.                                                                                                                                                                                                         |
+| `src/core/builder.test.ts` | Same.                                                                                                                                                                                                         |
+| `CLAUDE.md`                | Update Section 3 "Config-First WorkflowBuilder" to describe the new "Accumulating Builder" pattern; add version entry to Section 5.                                                                           |
+| `README.md`                | Update quick-start snippet.                                                                                                                                                                                   |
+| `docs/`                    | Update all code blocks that show `createWorkflow({ states: [...] })`.                                                                                                                                         |
 
 **No changes to:** `WorkflowEngine`, `WorkflowInstance`, `Workflow`, `StateRegistry`, all state classes, all guard classes, `MermaidExporter`, `JsonGraphExporter`, snapshot format, `WorkflowDefinition` type.
 
@@ -555,16 +569,16 @@ The call order changes slightly — branches before fork, prerequisites before j
 
 ### What type-safety guarantees are preserved
 
-| Guarantee | Before | After |
-|---|---|---|
-| Typo in `addTransition.from` caught at compile time | Yes (`TStates` from array) | Yes (`TStates` accumulated from calls) |
-| Typo in `addTransition.to` caught at compile time | Yes | Yes |
-| Typo in `addTransition.on` caught at compile time | Yes | Yes |
-| Wrong action payload type in `dispatch` | Yes | Yes |
-| Typo in `addFork.targets` caught at compile time | Yes | Yes — plus forward-reference now also caught |
-| Typo in `addJoin.requires` caught at compile time | Yes | Yes — plus forward-reference now also caught |
-| Typo in `setInitial` caught at compile time | Yes | Yes |
-| Typo in `setTerminal` caught at compile time | Yes | Yes |
+| Guarantee                                           | Before                     | After                                        |
+| --------------------------------------------------- | -------------------------- | -------------------------------------------- |
+| Typo in `addTransition.from` caught at compile time | Yes (`TStates` from array) | Yes (`TStates` accumulated from calls)       |
+| Typo in `addTransition.to` caught at compile time   | Yes                        | Yes                                          |
+| Typo in `addTransition.on` caught at compile time   | Yes                        | Yes                                          |
+| Wrong action payload type in `dispatch`             | Yes                        | Yes                                          |
+| Typo in `addFork.targets` caught at compile time    | Yes                        | Yes — plus forward-reference now also caught |
+| Typo in `addJoin.requires` caught at compile time   | Yes                        | Yes — plus forward-reference now also caught |
+| Typo in `setInitial` caught at compile time         | Yes                        | Yes                                          |
+| Typo in `setTerminal` caught at compile time        | Yes                        | Yes                                          |
 
 The new constraint is **strictly stronger** than the old one on `targets` and `requires`: previously a state in `targets` that was never registered with `addFork` would only fail at `build()` runtime. Now it fails at compile time because the string literal is not assignable to `TStates`.
 
@@ -582,6 +596,7 @@ The new constraint is **strictly stronger** than the old one on `targets` and `r
 6. Change `createWorkflow` signature: remove `const TStates` type parameter and `states` from config. Return type is `WorkflowBuilder<Record<never, never>, never>`.
 
 **Exit criteria:**
+
 - `pnpm typecheck` — zero errors
 - `pnpm test` — all tests pass (some will fail if they still pass `states: [...]`; fix those in phase 4b)
 
@@ -590,15 +605,18 @@ The new constraint is **strictly stronger** than the old one on `targets` and `r
 ### Phase 4b — Migrate examples and tests
 
 For every call site that uses `createWorkflow({ name: '...', states: [...] })`:
+
 1. Remove the `states: [...]` property from the call.
 2. Re-order `addStep`/`addFork`/`addJoin`/`addWait` calls so that any state referenced in `targets` or `requires` appears **before** the fork/join that references it.
 
 **Locate all call sites:**
+
 ```sh
 grep -rn 'states:' examples/ tests/ src/
 ```
 
 **Exit criteria:**
+
 - `pnpm lint && pnpm typecheck && pnpm test && pnpm build` — all four clean
 - `grep -rn 'states: \[' examples/ tests/ src/` — zero hits
 
@@ -616,6 +634,7 @@ grep -rn 'states:' examples/ tests/ src/
 - Update `README.md` quick-start snippet.
 
 **Exit criteria:**
+
 - `pnpm docs:build` — clean
 - No doc page shows `states: [` in a code block
 
@@ -623,10 +642,10 @@ grep -rn 'states:' examples/ tests/ src/
 
 ### Phase 4 — Execution order summary
 
-| Phase | Scope | Risk | Tests break? |
-|---|---|---|---|
-| 4a | `builder.ts` + `createWorkflow` type changes | Medium — changes public API signature | Yes — call sites still pass `states:[]` |
-| 4b | Migrate all call sites | Low — mechanical | Only if reorder is wrong |
-| 4c | Docs + CLAUDE.md | None | No |
+| Phase | Scope                                        | Risk                                  | Tests break?                            |
+| ----- | -------------------------------------------- | ------------------------------------- | --------------------------------------- |
+| 4a    | `builder.ts` + `createWorkflow` type changes | Medium — changes public API signature | Yes — call sites still pass `states:[]` |
+| 4b    | Migrate all call sites                       | Low — mechanical                      | Only if reorder is wrong                |
+| 4c    | Docs + CLAUDE.md                             | None                                  | No                                      |
 
 Phases 4a and 4b must be committed together — 4a alone will break the build until call sites are updated.

@@ -37,7 +37,7 @@ console.log(inst.getCurrentStates()); // ['s2']
 
 await inst.dispatch('ACTION_B', { actorId: 'bob' });
 console.log(inst.getCurrentStates()); // ['s3']
-console.log(inst.isTerminal());       // true
+console.log(inst.isTerminal()); // true
 ```
 
 ## Rules

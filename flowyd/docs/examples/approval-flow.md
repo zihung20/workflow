@@ -65,20 +65,20 @@ async function run() {
 
   // Step 1 — submit the draft
   const r1 = await inst.dispatch('SUBMIT', { submitterId: 'alice' });
-  console.log(r1.success);               // true
-  console.log(inst.getCurrentStates());  // ['pending-approval']
+  console.log(r1.success); // true
+  console.log(inst.getCurrentStates()); // ['pending-approval']
 
   // Step 2 — a non-manager tries to approve (guard blocks)
   const r2 = await inst.dispatch('APPROVE', { approverId: 'bob', reason: 'LGTM' });
-  console.log(r2.success);              // false
+  console.log(r2.success); // false
   console.log(!r2.success && r2.reason); // 'guard-failed'
   console.log(inst.getCurrentStates()); // ['pending-approval'] — unchanged
 
   // Step 3 — the manager approves
   const r3 = await inst.dispatch('APPROVE', { approverId: 'mgr-1', reason: 'LGTM' });
-  console.log(r3.success);              // true
+  console.log(r3.success); // true
   console.log(inst.getCurrentStates()); // ['approved']
-  console.log(inst.isTerminal());       // true
+  console.log(inst.isTerminal()); // true
 
   // ── Persist and restore ──────────────────────────────────────────────────
 
@@ -92,7 +92,7 @@ async function run() {
   restored.injectGuard('isManager', async (ctx) => ctx.payload.approverId === 'mgr-1');
 
   console.log(restored.getCurrentStates()); // ['approved']
-  console.log(restored.isTerminal());       // true
+  console.log(restored.isTerminal()); // true
   console.log(restored.getSnapshot().history.map((h) => h.action));
   // ['SUBMIT', 'APPROVE']
 }

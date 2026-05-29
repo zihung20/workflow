@@ -6,7 +6,6 @@
 import type { WorkflowInstance, InstanceSnapshot, DispatchResult } from 'flowyd';
 ```
 
-
 ## WorkflowInstance methods
 
 ### `dispatch(action, payload)`
@@ -24,6 +23,7 @@ Validates the payload, evaluates guards, and applies state transitions atomicall
 - **On failure** — returns `TransitionBlocked` with **no state change**
 
 **Throws** (does not return failure):
+
 - `ZodError` — payload fails the action's Zod schema
 - `Error` — a named guard has not been injected
 
@@ -105,7 +105,6 @@ Promotes a `WaitState` from `waiting` → `active`. Call from your service layer
 
 **Throws** if `stateId` is not a `WaitState` or is not currently `waiting`.
 
-
 ## DispatchResult
 
 `dispatch` returns a discriminated union on the `success` field:
@@ -121,8 +120,8 @@ interface TransitionSuccess {
   success: true;
   action: string;
   enteredStates: readonly string[]; // states that became active/waiting this tick
-  exitedStates: readonly string[];  // states that completed this tick
-  snapshot: InstanceSnapshot;       // the new snapshot (already committed internally)
+  exitedStates: readonly string[]; // states that completed this tick
+  snapshot: InstanceSnapshot; // the new snapshot (already committed internally)
 }
 ```
 
@@ -133,10 +132,10 @@ interface TransitionBlocked {
   success: false;
   action: string;
   reason:
-    | 'terminal-state'    // workflow has already ended
-    | 'invalid-action'    // no transitions exist for this action name
-    | 'no-active-source'  // action exists but none of its source states are active
-    | 'guard-failed';     // all matching transitions were blocked by guards
+    | 'terminal-state' // workflow has already ended
+    | 'invalid-action' // no transitions exist for this action name
+    | 'no-active-source' // action exists but none of its source states are active
+    | 'guard-failed'; // all matching transitions were blocked by guards
   activeStates: string[];
 }
 ```
@@ -145,12 +144,12 @@ When `success` is `false`, the instance state is **unchanged**.
 
 ### Reason reference
 
-| Reason | Meaning | Suggested HTTP response |
-|---|---|---|
-| `terminal-state` | Workflow has already reached a terminal state | 409 Conflict |
-| `invalid-action` | Action name has no transitions defined | 400 Bad Request |
-| `no-active-source` | Action is defined but no active state has this transition | 400 Bad Request |
-| `guard-failed` | Transitions exist but all guards blocked | 403 Forbidden |
+| Reason             | Meaning                                                   | Suggested HTTP response |
+| ------------------ | --------------------------------------------------------- | ----------------------- |
+| `terminal-state`   | Workflow has already reached a terminal state             | 409 Conflict            |
+| `invalid-action`   | Action name has no transitions defined                    | 400 Bad Request         |
+| `no-active-source` | Action is defined but no active state has this transition | 400 Bad Request         |
+| `guard-failed`     | Transitions exist but all guards blocked                  | 403 Forbidden           |
 
 ### Exhaustive switch
 

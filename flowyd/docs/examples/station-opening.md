@@ -124,7 +124,7 @@ async function runStationOpening() {
     timestamp: new Date().toISOString(),
   });
 
-  console.log(canUnlockWithCard);    // true  — button enabled
+  console.log(canUnlockWithCard); // true  — button enabled
   console.log(canUnlockWithoutCard); // false — button disabled
   console.log(inst.getCurrentStates()); // ['closed'] — canExecute changes nothing
 
@@ -142,9 +142,9 @@ async function runStationOpening() {
     issuesFound: ['Escalator E3 out of service'],
     completedAt: new Date().toISOString(),
   });
-  console.log(blocked.success);              // false
+  console.log(blocked.success); // false
   console.log(!blocked.success && blocked.reason); // 'guard-failed'
-  console.log(inst.getCurrentStates());      // ['premises-unlocked'] — unchanged
+  console.log(inst.getCurrentStates()); // ['premises-unlocked'] — unchanged
 
   // Issue resolved — re-submit with no issues
   await inst.dispatch('COMPLETE_SAFETY_WALK', {
@@ -156,7 +156,7 @@ async function runStationOpening() {
 
   // ── Snapshot hand-off: simulate a shift handover or server restart ────────
   const snapshot = inst.getSnapshot();
-  console.log(snapshot.version);       // 2
+  console.log(snapshot.version); // 2
   console.log(snapshot.stateStatuses); // { closed: 'completed', 'premises-unlocked': 'completed', 'safety-walk-done': 'active', ... }
 
   // The incoming supervisor (or a restarted server) restores from the snapshot
@@ -184,7 +184,7 @@ async function runStationOpening() {
   });
 
   console.log(restored.getCurrentStates()); // ['open-for-service']
-  console.log(restored.isTerminal());       // true
+  console.log(restored.isTerminal()); // true
 
   // ── State diagram with live status overlay ────────────────────────────────
   // Passing the snapshot adds CSS class annotations (active/waiting/completed)

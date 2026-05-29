@@ -9,9 +9,7 @@ import { createWorkflow } from 'flowyd';
 ## `createWorkflow(config)`
 
 ```ts
-function createWorkflow(config: {
-  name: string;
-}): WorkflowBuilder<Record<never, never>, never>
+function createWorkflow(config: { name: string }): WorkflowBuilder<Record<never, never>, never>;
 ```
 
 Instantiates a `WorkflowBuilder` with `TStates = never`. Each subsequent `addStep`, `addFork`, `addJoin`, or `addWait` call widens `TStates` by one literal — every call is constrained to the accumulated union, so typos are compile errors.
@@ -79,10 +77,10 @@ addJoin(id: TStates, options: {
 
 Registers a `JoinState`. Activates automatically when the `mode` threshold of `requires` states is satisfied. The `requires` array is constrained to `TStates`.
 
-| `mode` | Activates when |
-|---|---|
-| `'all'` | All states in `requires` are `completed` |
-| `'any'` | At least one state in `requires` is `completed` |
+| `mode`     | Activates when                                  |
+| ---------- | ----------------------------------------------- |
+| `'all'`    | All states in `requires` are `completed`        |
+| `'any'`    | At least one state in `requires` is `completed` |
 | `number N` | At least N states in `requires` are `completed` |
 
 ## `.addWait(id, options?)`
@@ -135,6 +133,7 @@ build(): Workflow<TActions, TStates>
 Validates the complete definition and returns an immutable `Workflow` object.
 
 **Throws** if:
+
 - Any declared state was not registered via `addStep/addFork/addJoin/addWait`
 - No initial state was set
 - No terminal state was set

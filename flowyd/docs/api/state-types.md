@@ -3,25 +3,30 @@
 States are the nodes of the workflow graph. Each state has a unique `id`, a `kind` literal, and a `label` for visualization.
 
 ```ts
-import type { IStepState, IForkState, IJoinState, IWaitState, StateStatus, StateKind } from 'flowyd';
+import type {
+  IStepState,
+  IForkState,
+  IJoinState,
+  IWaitState,
+  StateStatus,
+  StateKind,
+} from 'flowyd';
 ```
 
 You register states via the builder methods — you do not instantiate state classes directly.
-
 
 ## State statuses
 
 Every state moves through a fixed progression:
 
-| Status | Meaning |
-|---|---|
-| `idle` | Not yet entered |
-| `active` | Currently active — awaiting a dispatch |
-| `waiting` | `WaitState` only — paused until `resolveWait` is called |
-| `completed` | Exited; will not become active again |
+| Status      | Meaning                                                 |
+| ----------- | ------------------------------------------------------- |
+| `idle`      | Not yet entered                                         |
+| `active`    | Currently active — awaiting a dispatch                  |
+| `waiting`   | `WaitState` only — paused until `resolveWait` is called |
+| `completed` | Exited; will not become active again                    |
 
 States move forward only. The engine never reverses a status.
-
 
 ## StepState — `kind: 'step'`
 
@@ -36,12 +41,11 @@ The fundamental building block. Becomes `active` on entry and waits for a dispat
 
 **Options:**
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `label` | `string` | `id` | Human-readable label for visualization |
+| Option  | Type     | Default | Description                            |
+| ------- | -------- | ------- | -------------------------------------- |
+| `label` | `string` | `id`    | Human-readable label for visualization |
 
 **Use when:** the workflow is paused at this node waiting for a human or system action.
-
 
 ## ForkState — `kind: 'fork'`
 
@@ -58,13 +62,12 @@ A routing node. On entry it immediately activates all `targets` and marks itself
 
 **Options:**
 
-| Option | Type | Default | Description |
-|---|---|---|---|
+| Option    | Type        | Default  | Description                       |
+| --------- | ----------- | -------- | --------------------------------- |
 | `targets` | `TStates[]` | required | States to activate simultaneously |
-| `label` | `string` | `id` | Human-readable label |
+| `label`   | `string`    | `id`     | Human-readable label              |
 
 **Use when:** multiple steps must run concurrently and independently.
-
 
 ## JoinState — `kind: 'join'`
 
@@ -82,20 +85,19 @@ Activates automatically when the `mode` threshold of `requires` states is satisf
 
 **Options:**
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `requires` | `TStates[]` | required | States that must complete before activation |
-| `mode` | `'all' \| 'any' \| number` | required | Activation threshold |
-| `label` | `string` | `id` | Human-readable label |
+| Option     | Type                       | Default  | Description                                 |
+| ---------- | -------------------------- | -------- | ------------------------------------------- |
+| `requires` | `TStates[]`                | required | States that must complete before activation |
+| `mode`     | `'all' \| 'any' \| number` | required | Activation threshold                        |
+| `label`    | `string`                   | `id`     | Human-readable label                        |
 
-| `mode` value | Activates when |
-|---|---|
-| `'all'` | Every state in `requires` is `completed` |
-| `'any'` | At least one state in `requires` is `completed` |
-| `number N` | At least N states in `requires` are `completed` |
+| `mode` value | Activates when                                  |
+| ------------ | ----------------------------------------------- |
+| `'all'`      | Every state in `requires` is `completed`        |
+| `'any'`      | At least one state in `requires` is `completed` |
+| `number N`   | At least N states in `requires` are `completed` |
 
 **Use when:** re-synchronising parallel branches after a `ForkState`.
-
 
 ## WaitState — `kind: 'wait'`
 
@@ -110,13 +112,12 @@ On entry its status becomes `waiting` (not `active`). The workflow is paused. Re
 
 **Options:**
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `externalName` | `string` | `id` | Name of the external process (documentary only) |
-| `label` | `string` | `id` | Human-readable label |
+| Option         | Type     | Default | Description                                     |
+| -------------- | -------- | ------- | ----------------------------------------------- |
+| `externalName` | `string` | `id`    | Name of the external process (documentary only) |
+| `label`        | `string` | `id`    | Human-readable label                            |
 
 **Use when:** the workflow must wait for an external system — webhook, background job, human action in another system — before continuing.
-
 
 ## StateKind enum
 
@@ -131,7 +132,6 @@ enum StateKind {
 
 Use `state.kind === StateKind.Fork` to narrow the `AnyState` discriminated union. Do not cast with `state as IForkState`.
 
-
 ## AnyState discriminated union
 
 ```ts
@@ -143,10 +143,14 @@ Narrow via the `kind` property:
 ```ts
 function describeState(state: AnyState): string {
   switch (state.kind) {
-    case StateKind.Step: return `step: ${state.id}`;
-    case StateKind.Fork: return `fork → ${state.targets.join(', ')}`;
-    case StateKind.Join: return `join (${state.mode}): ${state.requires.join(', ')}`;
-    case StateKind.Wait: return `wait: ${state.externalName ?? state.id}`;
+    case StateKind.Step:
+      return `step: ${state.id}`;
+    case StateKind.Fork:
+      return `fork → ${state.targets.join(', ')}`;
+    case StateKind.Join:
+      return `join (${state.mode}): ${state.requires.join(', ')}`;
+    case StateKind.Wait:
+      return `wait: ${state.externalName ?? state.id}`;
   }
 }
 ```

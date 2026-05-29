@@ -49,6 +49,7 @@ Use an inline function when the guard is a pure expression with no external depe
 ```
 
 The inline function receives a `GuardContext` with:
+
 - `ctx.payload` — the validated action payload
 - `ctx.instanceState` — read-only view of all state statuses
 
@@ -66,10 +67,10 @@ Pre-built guards that inspect live instance state:
 
 ```ts
 // Allow APPROVE only after legal-review has completed
-guard: Guard.stateCompleted('legal-review')
+guard: Guard.stateCompleted('legal-review');
 
 // Allow ESCALATE only while incident-triage is still active
-guard: Guard.stateActive('incident-triage')
+guard: Guard.stateActive('incident-triage');
 ```
 
 ## Guard.and / Guard.or / Guard.not — composition
@@ -82,13 +83,13 @@ guard: Guard.and([
   Guard.inject('isManager'),
   Guard.stateCompleted('legal-review'),
   Guard.not(Guard.inject('isOnLeave')),
-])
+]);
 
 // At least one must pass
-guard: Guard.or([Guard.inject('isSupervisor'), Guard.inject('isAdmin')])
+guard: Guard.or([Guard.inject('isSupervisor'), Guard.inject('isAdmin')]);
 
 // Invert any guard
-guard: Guard.not(Guard.inject('isBlocked'))
+guard: Guard.not(Guard.inject('isBlocked'));
 ```
 
 ## Guard.always / Guard.never
@@ -97,7 +98,7 @@ Useful in tests:
 
 ```ts
 Guard.always(); // always returns true
-Guard.never();  // always returns false
+Guard.never(); // always returns false
 ```
 
 ## Multiple transitions on the same action

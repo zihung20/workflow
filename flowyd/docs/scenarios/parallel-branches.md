@@ -64,15 +64,15 @@ console.log(inst.getCurrentStates()); // ['join']
 
 await inst.dispatch('FINALIZE', {});
 console.log(inst.getCurrentStates()); // ['approved']
-console.log(inst.isTerminal());       // true
+console.log(inst.isTerminal()); // true
 ```
 
 ## JoinState modes
 
-| Mode | Activates when |
-|---|---|
-| `'all'` | Every state in `requires` is completed |
-| `'any'` | At least one state in `requires` is completed |
+| Mode       | Activates when                                |
+| ---------- | --------------------------------------------- |
+| `'all'`    | Every state in `requires` is completed        |
+| `'any'`    | At least one state in `requires` is completed |
 | `number N` | At least N states in `requires` are completed |
 
 ```ts

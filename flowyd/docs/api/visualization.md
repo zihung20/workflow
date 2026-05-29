@@ -8,7 +8,6 @@ import { MermaidExporter, JsonGraphExporter } from 'flowyd/visualization';
 
 Both exporters are stateless — pass a definition and an optional snapshot.
 
-
 ## MermaidExporter
 
 ```ts
@@ -30,12 +29,12 @@ const diagram = MermaidExporter.export(workflow.getDefinition(), inst.getSnapsho
 
 ### State kind indicators
 
-| Kind | Notation |
-|---|---|
-| `step` | Plain label |
+| Kind   | Notation                                                  |
+| ------ | --------------------------------------------------------- |
+| `step` | Plain label                                               |
 | `fork` | `state id <<fork>>` (rendered as UML synchronisation bar) |
 | `join` | `state id <<join>>` (rendered as UML synchronisation bar) |
-| `wait` | Label suffix ` ⤴` |
+| `wait` | Label suffix ` ⤴`                                         |
 
 ### Live status overlay
 
@@ -50,11 +49,16 @@ class payment_processing waiting
 Classes emitted: `active`, `waiting`, `completed`. Style in your renderer:
 
 ```css
-.active    { fill: #2196f3; }
-.waiting   { fill: #ff9800; }
-.completed { fill: #4caf50; }
+.active {
+  fill: #2196f3;
+}
+.waiting {
+  fill: #ff9800;
+}
+.completed {
+  fill: #4caf50;
+}
 ```
-
 
 ## JsonGraphExporter
 
@@ -96,13 +100,13 @@ interface JsonGraphNode {
   label: string;
   isInitial: boolean;
   isTerminal: boolean;
-  status?: StateStatus;   // present only when a snapshot is provided
-  targets?: string[];     // ForkState only
+  status?: StateStatus; // present only when a snapshot is provided
+  targets?: string[]; // ForkState only
   join?: {
     requires: string[];
     mode: string | number;
-  };                      // JoinState only
-  externalName?: string;  // WaitState only
+  }; // JoinState only
+  externalName?: string; // WaitState only
 }
 ```
 
@@ -110,7 +114,7 @@ interface JsonGraphNode {
 
 ```ts
 interface JsonGraphEdge {
-  id: string;      // "{from}__{action}__{to}__{index}"
+  id: string; // "{from}__{action}__{to}__{index}"
   from: string;
   to: string;
   action: string;
@@ -119,7 +123,6 @@ interface JsonGraphEdge {
 ```
 
 `hasGuard` lets dashboards highlight which transitions require authorization.
-
 
 ## Getting the definition
 

@@ -40,7 +40,11 @@ export class NeverGuard implements IGuard<unknown> {
  * @template T        - The payload type the wrapped function expects.
  * @template TContext - The instance context type the function expects.
  */
-export class FnGuard<T = unknown, TContext = unknown, TStates extends string = string> implements IGuard<unknown> {
+export class FnGuard<
+  T = unknown,
+  TContext = unknown,
+  TStates extends string = string,
+> implements IGuard<unknown> {
   constructor(private readonly fn: GuardFn<T, TContext, TStates>) {}
 
   evaluate(ctx: GuardContext<unknown>): Promise<boolean> {

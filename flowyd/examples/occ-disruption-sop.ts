@@ -199,7 +199,11 @@ const occDisruptionSop = createWorkflow({
     on: 'AUTHORISE_RESPONSE',
     guard: isDutyManager,
   })
-  .addTransition({ from: 'response-authorised', to: 'notification-fork', on: 'START_NOTIFICATIONS' })
+  .addTransition({
+    from: 'response-authorised',
+    to: 'notification-fork',
+    on: 'START_NOTIFICATIONS',
+  })
   .addTransition({ from: 'ops-team', to: 'notification-join', on: 'NOTIFY_OPS_TEAM' })
   .addTransition({ from: 'stn-masters', to: 'notification-join', on: 'NOTIFY_STN_MASTERS' })
   .addTransition({ from: 'public-comms', to: 'notification-join', on: 'NOTIFY_PUBLIC' })

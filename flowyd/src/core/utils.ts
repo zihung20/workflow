@@ -24,6 +24,8 @@ export function typedEntries<K extends string, V>(obj: Readonly<Record<K, V>>): 
  * @param entries - An iterable of `[K, V]` pairs (e.g. a `Map<K, V>`).
  * @returns A `Record<K, V>` — identical to `Object.fromEntries` at runtime.
  */
-export function typedFromEntries<K extends string, V>(entries: Iterable<readonly [K, V]>): Record<K, V> {
+export function typedFromEntries<K extends string, V>(
+  entries: Iterable<readonly [K, V]>,
+): Record<K, V> {
   return Object.fromEntries(entries) as Record<K, V>;
 }

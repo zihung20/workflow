@@ -63,6 +63,6 @@ The physical separation enforces the architectural rule at the toolchain level, 
 
 `TStates` starts as `never` and widens by one literal with every `addStep`, `addFork`, `addJoin`, or `addWait` call — the same accumulating-generic pattern `TActions` uses for `defineAction`. No upfront `states` array is required; the compiler knows exactly which IDs are in scope at each point in the chain.
 
-`addFork.targets` and `addJoin.requires` are constrained to the `TStates` accumulated *before* that call — so branch states must be registered before the fork or join that targets them. This is an ordering rule enforced at compile time.
+`addFork.targets` and `addJoin.requires` are constrained to the `TStates` accumulated _before_ that call — so branch states must be registered before the fork or join that targets them. This is an ordering rule enforced at compile time.
 
 All four state-registration methods return `WorkflowBuilder<TActions, TStates | K>` (a new generic specialization). At runtime the same object is returned via `as unknown as …` casts; only the TypeScript type changes. `setInitial`, `setTerminal`, and `addTransition` return `this`. This design gives compile-time safety on `addTransition`, `dispatch`, and `canExecute`, catching state-ID and action-name typos at compile time rather than at `build()` time.

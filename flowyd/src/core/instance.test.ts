@@ -263,9 +263,9 @@ describe('WorkflowInstance — rewind', () => {
       .build();
 
     const inst = wf.createInstance('rw-ctx-001', { step: 1 });
-    await inst.dispatch('GO', {});           // version 1, context was { step: 1 }
+    await inst.dispatch('GO', {}); // version 1, context was { step: 1 }
     inst.setContext({ step: 2 });
-    await inst.dispatch('GO', {});           // version 2, context was { step: 2 }
+    await inst.dispatch('GO', {}); // version 2, context was { step: 2 }
 
     expect(inst.rewind(1).context).toEqual({ step: 1 });
     expect(inst.rewind(2).context).toEqual({ step: 2 });
@@ -308,8 +308,8 @@ describe('WorkflowInstance — rewind (delta replay)', () => {
   it('rewind replays resolveWait as Active (not Waiting)', async () => {
     const wf = makeWait();
     const inst = wf.createInstance('rw-w-002');
-    await inst.dispatch('START', {});  // v1: sub=Waiting
-    inst.resolveWait('sub');           // v2: sub=Active
+    await inst.dispatch('START', {}); // v1: sub=Waiting
+    inst.resolveWait('sub'); // v2: sub=Active
     const at2 = inst.rewind(2);
     expect(at2.stateStatuses['sub']).toBe(StateStatus.Active);
   });
@@ -326,8 +326,8 @@ describe('WorkflowInstance — rewind (delta replay)', () => {
   it('rewind correctly replays parallel branches mid-execution', async () => {
     const wf = makeFork();
     const inst = wf.createInstance('rw-f-001');
-    await inst.dispatch('START', {});   // v1: branch-a and branch-b both active
-    await inst.dispatch('DONE_A', {});  // v2: branch-a completed, join still idle
+    await inst.dispatch('START', {}); // v1: branch-a and branch-b both active
+    await inst.dispatch('DONE_A', {}); // v2: branch-a completed, join still idle
 
     const at1 = inst.rewind(1);
     expect(at1.stateStatuses['branch-a']).toBe(StateStatus.Active);
@@ -345,7 +345,7 @@ describe('WorkflowInstance — rewind (delta replay)', () => {
     const inst = wf.createInstance('rw-f-002');
     await inst.dispatch('START', {});
     await inst.dispatch('DONE_A', {});
-    await inst.dispatch('DONE_B', {});  // v3: join becomes Active
+    await inst.dispatch('DONE_B', {}); // v3: join becomes Active
 
     const at3 = inst.rewind(3);
     expect(at3.stateStatuses['join']).toBe(StateStatus.Active);
@@ -356,7 +356,7 @@ describe('WorkflowInstance — rewind (delta replay)', () => {
   it('unreached states are Idle in any rewound version', async () => {
     const wf = makeThreeStep();
     const inst = wf.createInstance('rw-idle-001');
-    await inst.dispatch('NEXT', {});  // a→b; c still idle
+    await inst.dispatch('NEXT', {}); // a→b; c still idle
 
     const at1 = inst.rewind(1);
     expect(at1.stateStatuses['c']).toBe(StateStatus.Idle);
@@ -434,7 +434,9 @@ describe('WorkflowInstance — typed dispatch result (TStates)', () => {
         const _exited: ('a' | 'b')[] = [...result.exitedStates];
         // @ts-expect-error 'unknown-state' is not a registered state ID
         const _bad: ('a' | 'b')[] = ['unknown-state'];
-        void _entered; void _exited; void _bad;
+        void _entered;
+        void _exited;
+        void _bad;
       }
     }
     expect(inst).toBeDefined();
@@ -462,7 +464,8 @@ describe('WorkflowInstance — typed dispatch result (TStates)', () => {
       const _action: 'GO' = result.action;
       // @ts-expect-error 'OTHER' is not the dispatched action
       const _bad: 'OTHER' = result.action;
-      void _action; void _bad;
+      void _action;
+      void _bad;
     }
     expect(inst).toBeDefined();
   });

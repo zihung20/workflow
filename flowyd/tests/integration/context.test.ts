@@ -52,8 +52,10 @@ describe('context — createInstance', () => {
   it('context is undefined when no schema was declared and no context is passed', () => {
     const wf = createWorkflow({ name: 'no-ctx' })
       .defineAction('GO', Empty)
-      .addStep('a').addStep('b')
-      .setInitial('a').setTerminal(['b'])
+      .addStep('a')
+      .addStep('b')
+      .setInitial('a')
+      .setTerminal(['b'])
       .addTransition({ from: 'a', to: 'b', on: 'GO' })
       .build();
     const inst = wf.createInstance('ctx-003');
@@ -133,9 +135,8 @@ describe('context — guards', () => {
       .build();
 
     const inst = wf.createInstance('ctx-023', { allowedIds: ['u1', 'u2'] });
-    inst.injectGuard<{ userId: string }, { allowedIds: string[] }>(
-      'isAllowed',
-      (ctx) => ctx.context.allowedIds.includes(ctx.payload.userId),
+    inst.injectGuard<{ userId: string }, { allowedIds: string[] }>('isAllowed', (ctx) =>
+      ctx.context.allowedIds.includes(ctx.payload.userId),
     );
 
     expect((await inst.dispatch('GO', { userId: 'u1' })).success).toBe(true);
@@ -216,8 +217,10 @@ describe('context — runtime Zod validation', () => {
     const wf = createWorkflow({ name: 'range-check' })
       .setContext(z.object({ level: z.number().min(1).max(10) }))
       .defineAction('GO', Empty)
-      .addStep('a').addStep('b')
-      .setInitial('a').setTerminal(['b'])
+      .addStep('a')
+      .addStep('b')
+      .setInitial('a')
+      .setTerminal(['b'])
       .addTransition({ from: 'a', to: 'b', on: 'GO' })
       .build();
 
@@ -231,23 +234,25 @@ describe('context — runtime Zod validation', () => {
     const wf = createWorkflow({ name: 'range-check-2' })
       .setContext(z.object({ level: z.number().min(1).max(10) }))
       .defineAction('GO', Empty)
-      .addStep('a').addStep('b')
-      .setInitial('a').setTerminal(['b'])
+      .addStep('a')
+      .addStep('b')
+      .setInitial('a')
+      .setTerminal(['b'])
       .addTransition({ from: 'a', to: 'b', on: 'GO' })
       .build();
 
     const inst = wf.createInstance('rt-002', { level: 5 });
-    expect(() =>
-      (inst.setContext as (ctx: unknown) => unknown)({ level: 11 }),
-    ).toThrow();
+    expect(() => (inst.setContext as (ctx: unknown) => unknown)({ level: 11 })).toThrow();
   });
 
   it('valid context passes through without error', () => {
     const wf = createWorkflow({ name: 'range-check-3' })
       .setContext(z.object({ level: z.number().min(1).max(10) }))
       .defineAction('GO', Empty)
-      .addStep('a').addStep('b')
-      .setInitial('a').setTerminal(['b'])
+      .addStep('a')
+      .addStep('b')
+      .setInitial('a')
+      .setTerminal(['b'])
       .addTransition({ from: 'a', to: 'b', on: 'GO' })
       .build();
 
@@ -258,15 +263,15 @@ describe('context — runtime Zod validation', () => {
     const wf = createWorkflow({ name: 'range-check-4' })
       .setContext(z.object({ level: z.number().min(1).max(10) }))
       .defineAction('GO', Empty)
-      .addStep('a').addStep('b')
-      .setInitial('a').setTerminal(['b'])
+      .addStep('a')
+      .addStep('b')
+      .setInitial('a')
+      .setTerminal(['b'])
       .addTransition({ from: 'a', to: 'b', on: 'GO' })
       .build();
 
     const inst = wf.createInstance('rt-004', { level: 5 });
-    expect(() =>
-      (inst.setContext as (ctx: unknown) => unknown)({ level: 11 }),
-    ).toThrow();
+    expect(() => (inst.setContext as (ctx: unknown) => unknown)({ level: 11 })).toThrow();
     expect(inst.getContext()).toEqual({ level: 5 });
   });
 });
@@ -308,8 +313,10 @@ describe('context — compile-time type safety', () => {
   it('createInstance does not require context when no schema was declared', () => {
     const wf = createWorkflow({ name: 'no-ctx-2' })
       .defineAction('GO', Empty)
-      .addStep('a').addStep('b')
-      .setInitial('a').setTerminal(['b'])
+      .addStep('a')
+      .addStep('b')
+      .setInitial('a')
+      .setTerminal(['b'])
       .addTransition({ from: 'a', to: 'b', on: 'GO' })
       .build();
     // no @ts-expect-error — context is optional here

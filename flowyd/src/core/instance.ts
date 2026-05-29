@@ -18,7 +18,7 @@ type Exact<Base, Given extends Base> = Given & { [K in Exclude<keyof Given, keyo
 import { StateStatus, StateKind } from '../types/index.js';
 import { GuardRegistry } from './registry.js';
 import { WorkflowEngine } from './engine.js';
-import { typedEntries } from './utils.js';
+import { typedEntries, typedFromEntries } from './utils.js';
 
 /**
  * Mutable runtime state for a single SOP execution.
@@ -40,7 +40,11 @@ import { typedEntries } from './utils.js';
  * @template TContext - Type of the instance context declared via
  *                      `WorkflowBuilder.setContext()`. Defaults to `unknown`.
  */
-export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unknown, TStates extends string = string> {
+export class WorkflowInstance<
+  TActions extends ActionPayloadMap,
+  TContext = unknown,
+  TStates extends string = string,
+> {
   private readonly guardRegistry = new GuardRegistry();
 
   /** @internal Created exclusively by `Workflow._createInstance` and `Workflow._restoreInstance`. */
@@ -60,7 +64,10 @@ export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unkn
    * @param fn   - The guard implementation. Annotate `TPayload` to match the
    *               payload type of the action(s) this guard is attached to.
    */
-  injectGuard<TPayload = unknown, TCtx = unknown>(name: string, fn: GuardFn<TPayload, TCtx, TStates>): this {
+  injectGuard<TPayload = unknown, TCtx = unknown>(
+    name: string,
+    fn: GuardFn<TPayload, TCtx, TStates>,
+  ): this {
     // Registry is type-erased (GuardFn<unknown>); TStates is asserted correct by construction.
     this.guardRegistry.register(name, fn as GuardFn<TPayload, TCtx>);
     return this;
@@ -108,10 +115,9 @@ export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unkn
    * is currently "at" (blocked on an external process).
    */
   getCurrentStates(): TStates[] {
-    // Cast is safe: stateStatuses keys are exclusively registered state IDs, which are TStates by construction.
-    return Object.entries(this.snapshot.stateStatuses)
+    return typedEntries(this.snapshot.stateStatuses)
       .filter(([, s]) => s === StateStatus.Active || s === StateStatus.Waiting)
-      .map(([id]) => id) as TStates[];
+      .map(([id]) => id);
   }
 
   /**
@@ -165,9 +171,9 @@ export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unkn
    * @param payload - The payload that would be passed to `dispatch`.
    * @returns `true` if at least one matching transition passes its guard.
    */
-  async canExecute<K extends keyof TActions & string, P extends TActions[K]>(
-    action: K,
-    payload: Exact<TActions[K], P>,
+  async canExecute<TAction extends keyof TActions & string, P extends TActions[TAction]>(
+    action: TAction,
+    payload: Exact<TActions[TAction], P>,
   ): Promise<boolean> {
     const result = await this.dispatch(action, payload, true);
     return result.success;
@@ -194,26 +200,26 @@ export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unkn
    * @throws {Error}    If a named guard referenced by the transition has not
    *                    been injected via `injectGuard()`.
    */
-  async dispatch<K extends keyof TActions & string, P extends TActions[K]>(
-    action: K,
-    payload: Exact<TActions[K], P>,
-  ): Promise<DispatchResult<TContext, TStates, K>>;
+  async dispatch<TAction extends keyof TActions & string, P extends TActions[TAction]>(
+    action: TAction,
+    payload: Exact<TActions[TAction], P>,
+  ): Promise<DispatchResult<TContext, TStates, TAction>>;
 
   /**
    * @internal Overload used by `canExecute` to perform a dry-run without
    *           committing state changes.
    */
-  async dispatch<K extends keyof TActions & string>(
-    action: K,
-    payload: TActions[K],
+  async dispatch<TAction extends keyof TActions & string>(
+    action: TAction,
+    payload: TActions[TAction],
     dryRun: boolean,
-  ): Promise<DispatchResult<TContext, TStates, K>>;
+  ): Promise<DispatchResult<TContext, TStates, TAction>>;
 
-  async dispatch<K extends keyof TActions & string>(
-    action: K,
-    payload: TActions[K],
+  async dispatch<TAction extends keyof TActions & string>(
+    action: TAction,
+    payload: TActions[TAction],
     dryRun = false,
-  ): Promise<DispatchResult<TContext, TStates, K>> {
+  ): Promise<DispatchResult<TContext, TStates, TAction>> {
     const schema = this.definition.actionSchemas.get(action);
     if (!schema) {
       throw new Error(`Action "${action}" is not registered in workflow "${this.definition.name}"`);
@@ -221,7 +227,7 @@ export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unkn
 
     const validatedPayload = schema.parse(payload);
 
-    const result = await WorkflowEngine.dispatch<TContext, TStates, K>(
+    const result = await WorkflowEngine.dispatch<TContext, TStates, TAction>(
       this.definition,
       this.buildReadonlyView(),
       this.guardRegistry,
@@ -264,11 +270,10 @@ export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unkn
       );
     }
 
-    // Cast is safe: spreading Record<TStates, StateStatus> and overwriting one TStates key.
     const updatedStatuses = {
       ...this.snapshot.stateStatuses,
       [stateId]: StateStatus.Active,
-    } as Readonly<Record<TStates, StateStatus>>;
+    };
 
     const ctx = this.snapshot.context;
     const historyEntry: HistoryEntry<TContext, TStates> = {
@@ -336,15 +341,11 @@ export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unkn
     }
 
     // Build the initial status map: every state idle, initial state active.
-    const stateStatuses: Record<string, StateStatus> = {};
+    const stateStatuses = new Map<TStates, StateStatus>();
     for (const id of this.definition.states.keys()) {
-      stateStatuses[id] = StateStatus.Idle;
+      stateStatuses.set(id, StateStatus.Idle);
     }
-    stateStatuses[this.definition.initialStateId] = StateStatus.Active;
-
-    // Cast is safe: stateStatuses is populated exclusively from registered state IDs,
-    // all of which are members of TStates by construction.
-    const typedStatuses = stateStatuses as Readonly<Record<TStates, StateStatus>>;
+    stateStatuses.set(this.definition.initialStateId, StateStatus.Active);
 
     if (version === 0) {
       // Use context from the first history entry if it exists (captures what was
@@ -354,7 +355,7 @@ export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unkn
         instanceId: this.snapshot.instanceId,
         workflowName: this.snapshot.workflowName,
         version: 0,
-        stateStatuses: typedStatuses,
+        stateStatuses: typedFromEntries(stateStatuses),
         isTerminal: false,
         history: [],
         createdAt: this.snapshot.createdAt,
@@ -370,20 +371,22 @@ export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unkn
     // the entered status from the state's kind.
     for (const entry of this.snapshot.history.slice(0, version)) {
       for (const id of entry.exitedStates) {
-        stateStatuses[id] = StateStatus.Completed;
+        stateStatuses.set(id, StateStatus.Completed);
       }
       for (const id of entry.enteredStates) {
         const isResolveWait = entry.action.startsWith('__resolve_wait:');
         const state = this.definition.states.get(id);
-        stateStatuses[id] =
+        stateStatuses.set(
+          id,
           !isResolveWait && state?.kind === StateKind.Wait
             ? StateStatus.Waiting
-            : StateStatus.Active;
+            : StateStatus.Active,
+        );
       }
     }
 
     const isTerminal = this.definition.terminalStateIds.some(
-      (id) => stateStatuses[id] === StateStatus.Active,
+      (id) => stateStatuses.get(id) === StateStatus.Active,
     );
 
     const entry = this.snapshot.history[version - 1]!;
@@ -394,7 +397,7 @@ export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unkn
       instanceId: this.snapshot.instanceId,
       workflowName: this.snapshot.workflowName,
       version,
-      stateStatuses: typedStatuses,
+      stateStatuses: typedFromEntries(stateStatuses),
       isTerminal,
       history: this.snapshot.history.slice(0, version),
       createdAt: this.snapshot.createdAt,
@@ -404,8 +407,6 @@ export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unkn
       contextAtN !== undefined ? { ...base, context: contextAtN } : base;
     return structuredClone(result);
   }
-
-  // ─── Internal helpers ─────────────────────────────────────────────────────
 
   /**
    * Constructs the `ReadonlyInstanceState` view passed to the engine and guards.

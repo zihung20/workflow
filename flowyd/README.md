@@ -74,7 +74,7 @@ import { createWorkflow, Guard } from 'flowyd';
 const purchaseOrder = createWorkflow({ name: 'purchase-order' })
   .defineAction('SUBMIT', z.object({ submitterId: z.string() }))
   .defineAction('APPROVE', z.object({ approverId: z.string(), reason: z.string() }))
-  .defineAction('REJECT',  z.object({ reason: z.string() }))
+  .defineAction('REJECT', z.object({ reason: z.string() }))
 
   .addStep('draft')
   .addStep('pending-approval')
@@ -84,9 +84,14 @@ const purchaseOrder = createWorkflow({ name: 'purchase-order' })
   .setInitial('draft')
   .setTerminal(['approved', 'rejected'])
 
-  .addTransition({ from: 'draft',            to: 'pending-approval', on: 'SUBMIT' })
-  .addTransition({ from: 'pending-approval', to: 'approved',         on: 'APPROVE', guard: Guard.inject('isManager') })
-  .addTransition({ from: 'pending-approval', to: 'rejected',         on: 'REJECT' })
+  .addTransition({ from: 'draft', to: 'pending-approval', on: 'SUBMIT' })
+  .addTransition({
+    from: 'pending-approval',
+    to: 'approved',
+    on: 'APPROVE',
+    guard: Guard.inject('isManager'),
+  })
+  .addTransition({ from: 'pending-approval', to: 'rejected', on: 'REJECT' })
 
   .build();
 
@@ -96,13 +101,13 @@ inst.injectGuard('isManager', async (ctx) => {
   return ctx.payload.approverId === 'mgr-1'; // replace with your auth check
 });
 
-await inst.dispatch('SUBMIT',  { submitterId: 'alice' });
+await inst.dispatch('SUBMIT', { submitterId: 'alice' });
 await inst.dispatch('APPROVE', { approverId: 'mgr-1', reason: 'LGTM' });
 
 console.log(inst.getCurrentStates()); // ['approved']
-console.log(inst.isTerminal());       // true
+console.log(inst.isTerminal()); // true
 
-const snapshot = inst.getSnapshot();  // plain JSON — save wherever you want
+const snapshot = inst.getSnapshot(); // plain JSON — save wherever you want
 ```
 
 ---
@@ -126,14 +131,14 @@ const snapshot = inst.getSnapshot();  // plain JSON — save wherever you want
 
 ## Documentation
 
-| Section | What's there |
-|---|---|
+| Section                                                         | What's there                                  |
+| --------------------------------------------------------------- | --------------------------------------------- |
 | [Introduction & type safety](https://your-docs-site.com/guide/) | What it is, compile-time guarantees in detail |
-| [Core Concepts](https://your-docs-site.com/guide/concepts) | States, transitions, guards, snapshots |
-| [Examples](https://your-docs-site.com/examples/) | Four complete runnable workflows |
-| [Scenarios](https://your-docs-site.com/scenarios/) | Task-based guides ("I want to…") |
-| [API Reference](https://your-docs-site.com/api/) | Complete method reference |
-| [Developer Guide](https://your-docs-site.com/dev/) | Architecture, contributing, design decisions |
+| [Core Concepts](https://your-docs-site.com/guide/concepts)      | States, transitions, guards, snapshots        |
+| [Examples](https://your-docs-site.com/examples/)                | Four complete runnable workflows              |
+| [Scenarios](https://your-docs-site.com/scenarios/)              | Task-based guides ("I want to…")              |
+| [API Reference](https://your-docs-site.com/api/)                | Complete method reference                     |
+| [Developer Guide](https://your-docs-site.com/dev/)              | Architecture, contributing, design decisions  |
 
 ---
 

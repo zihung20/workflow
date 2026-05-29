@@ -160,7 +160,10 @@ export class WorkflowBuilder<
    * @returns The same builder with `TStates` widened to `TStates | K`.
    * @throws {Error} If a state with the same `id` is already registered.
    */
-  addStep<K extends string>(id: K, options: { label?: string } = {}): WorkflowBuilder<TActions, TStates | K, TContext> {
+  addStep<K extends string>(
+    id: K,
+    options: { label?: string } = {},
+  ): WorkflowBuilder<TActions, TStates | K, TContext> {
     this.stateRegistry.register(new StepState(id, options));
     return this as WorkflowBuilder<TActions, TStates | K, TContext>;
   }

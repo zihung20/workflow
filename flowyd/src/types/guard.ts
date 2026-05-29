@@ -66,4 +66,6 @@ export interface IGuard<TPayload = unknown> {
  *                      used as an inline guard on `addTransition`. Annotate
  *                      explicitly when used with `Guard.fn<TPayload, TContext>()`.
  */
-export type GuardFn<TPayload, TContext = unknown, TStates extends string = string> = (ctx: GuardContext<TPayload, TContext, TStates>) => boolean | Promise<boolean>;
+export type GuardFn<TPayload, TContext = unknown, TStates extends string = string> = (
+  ctx: GuardContext<TPayload, TContext, TStates>,
+) => boolean | Promise<boolean>;

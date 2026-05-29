@@ -18,7 +18,9 @@ function buildLinearChain(stateCount: number) {
   const ids = Array.from({ length: stateCount }, (_, i) => `s${i}`);
   const builder = createDynamicWorkflow({ name: `linear-${stateCount}` });
   builder.defineAction('NEXT', z.object({}));
-  for (const id of ids) {builder.addStep(id);}
+  for (const id of ids) {
+    builder.addStep(id);
+  }
   builder.setInitial(ids[0]!).setTerminal([ids[stateCount - 1]!]);
   for (let i = 0; i < stateCount - 1; i++) {
     builder.addTransition({ from: ids[i]!, to: ids[i + 1]!, on: 'NEXT' });
@@ -58,9 +60,13 @@ function buildParallelBranches(branchCount: number) {
   const builder = createDynamicWorkflow({ name: `parallel-${branchCount}` });
   builder.defineAction('START', z.object({}));
   builder.defineAction('COMPLETE_ALL', z.object({}));
-  for (let i = 0; i < branchCount; i++) {builder.defineAction(`DONE_${i}`, z.object({}));}
+  for (let i = 0; i < branchCount; i++) {
+    builder.defineAction(`DONE_${i}`, z.object({}));
+  }
   builder.addStep('start').addFork('fork', { targets: branches as [string, ...string[]] });
-  for (const b of branches) {builder.addStep(b);}
+  for (const b of branches) {
+    builder.addStep(b);
+  }
   builder.addJoin('join', { requires: branches as [string, ...string[]], mode: 'all' });
   builder.addStep('end');
   builder.setInitial('start').setTerminal(['end']);
@@ -105,15 +111,15 @@ describe('Perf: history depth scaling', () => {
 
       const window = Math.min(50, Math.floor(n / 10));
       const early = windowMean(samples, 0, window);
-      const mid   = windowMean(samples, Math.floor(n / 2), window);
-      const late  = windowMean(samples, n - 1 - window, window);
+      const mid = windowMean(samples, Math.floor(n / 2), window);
+      const late = windowMean(samples, n - 1 - window, window);
       const total = samples.reduce((a, b) => a + b, 0);
 
       console.log(
         `\n  [chain-${n}]` +
-        `  total=${total.toFixed(1)}ms` +
-        `  early=${early.toFixed(3)}ms  mid=${mid.toFixed(3)}ms  late=${late.toFixed(3)}ms` +
-        `  growth(late/early)=${(late / early).toFixed(2)}x`,
+          `  total=${total.toFixed(1)}ms` +
+          `  early=${early.toFixed(3)}ms  mid=${mid.toFixed(3)}ms  late=${late.toFixed(3)}ms` +
+          `  growth(late/early)=${(late / early).toFixed(2)}x`,
       );
     }, 60_000);
   }
@@ -145,7 +151,7 @@ describe('Perf: transition count scaling (O(T) scan)', () => {
       const total = samples.reduce((a, b) => a + b, 0);
       console.log(
         `\n  [hub-${t}T]` +
-        `  ${RUNS} runs  total=${total.toFixed(1)}ms  avg/dispatch=${avg.toFixed(3)}ms`,
+          `  ${RUNS} runs  total=${total.toFixed(1)}ms  avg/dispatch=${avg.toFixed(3)}ms`,
       );
     });
   }
@@ -183,8 +189,8 @@ describe('Perf: fork/join fixed-point loop scaling', () => {
       const totalDispatches = b + 2;
       console.log(
         `\n  [fork-${b}B]` +
-        `  total=${elapsed.toFixed(1)}ms  dispatches=${totalDispatches}` +
-        `  avg/dispatch=${(elapsed / totalDispatches).toFixed(3)}ms`,
+          `  total=${elapsed.toFixed(1)}ms  dispatches=${totalDispatches}` +
+          `  avg/dispatch=${(elapsed / totalDispatches).toFixed(3)}ms`,
       );
     }, 30_000);
   }
@@ -215,10 +221,7 @@ describe('Perf: getSnapshot() structuredClone cost at different history depths',
       }
 
       const avg = mean(samples);
-      console.log(
-        `\n  [snap-${n}]` +
-        `  history=${n - 1}  avg getSnapshot()=${avg.toFixed(3)}ms`,
-      );
+      console.log(`\n  [snap-${n}]` + `  history=${n - 1}  avg getSnapshot()=${avg.toFixed(3)}ms`);
     }, 30_000);
   }
 });

@@ -6,7 +6,6 @@ It is designed for Standard Operating Procedures (SOPs) — real-world processes
 
 **[Full documentation →](https://your-docs-site.com)**
 
-
 ## The selling point: compile-time safety on everything
 
 Most workflow libraries let you write strings wherever you please. A typo in a state ID silently creates dead code. A wrong action name fails at runtime. A mismatched payload produces a confusing error in production.
@@ -24,7 +23,7 @@ const wf = createWorkflow({ name: 'approval' })
   .addStep('approved')
   .addStep('rejected')
   .setInitial('drft'); // TS2345: Argument of type '"drft"' is not assignable
-                       // to parameter of type '"draft" | "review" | "approved" | "rejected"'
+// to parameter of type '"draft" | "review" | "approved" | "rejected"'
 ```
 
 IDEs autocomplete state IDs throughout the entire chain. No typos make it to runtime.
@@ -68,20 +67,18 @@ createWorkflow({ name: 'proc' })
   .addStep('start')
   .addStep('a')
   .addStep('b')
-  .addFork('fork', { targets: ['a', 'b'] })      // autocompletes to accumulated TStates
-  .addJoin('join', { requires: ['a', 'b'], mode: 'all' })  // same
+  .addFork('fork', { targets: ['a', 'b'] }) // autocompletes to accumulated TStates
+  .addJoin('join', { requires: ['a', 'b'], mode: 'all' }) // same
   // But a typo at the point of registration:
-  .addFork('fork2', { targets: ['a', 'missspelled'] })
-  //                                ^^^^^^^^^^^^ compile error — 'missspelled' not in TStates
+  .addFork('fork2', { targets: ['a', 'missspelled'] });
+//                                ^^^^^^^^^^^^ compile error — 'missspelled' not in TStates
 ```
-
 
 ## What it is not
 
 - **Not a visual designer.** You define workflows in TypeScript code. The companion [web-runner](../dev/contributing#web-runner) provides a browser UI, but code is the source of truth.
 - **Not an orchestration server.** There is no hosted runtime, no queue, no scheduler. `flowyd` is a pure library — you provide the storage, the transport, and the trigger mechanism.
 - **Not opinionated about storage.** Snapshots are plain JSON objects. Write them to Postgres, Redis, a file, or in memory — the library does not care.
-
 
 ## Next steps
 

@@ -138,8 +138,8 @@ async function runChecklist() {
     platform: 3,
     scheduledAt: '2024-05-20T06:00:00+08:00',
   });
-  console.log(result.success);               // true
-  console.log(instance.isTerminal());        // true
+  console.log(result.success); // true
+  console.log(instance.isTerminal()); // true
   console.log(instance.getSnapshot().history.length); // 7
 
   // ── Guard demo: certifies must be the literal `true` ──────────────────────
@@ -156,7 +156,7 @@ runChecklist().catch(console.error);
 
 ## What to notice
 
-**ForkState is never in `getCurrentStates`.**  After dispatching `START_INSPECTION`, the fork completes immediately and the three inspection states are what's active. The fork is a routing node, not a resting place.
+**ForkState is never in `getCurrentStates`.** After dispatching `START_INSPECTION`, the fork completes immediately and the three inspection states are what's active. The fork is a routing node, not a resting place.
 
 **JoinState activates automatically.** After the third inspection clears, the engine's fixed-point loop detects that all `requires` states are completed and activates `inspections-joined` in the same `dispatch` call. No extra action needed.
 
