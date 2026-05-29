@@ -10,12 +10,15 @@ import type { IGuard } from './guard.js';
  *
  * When fired, the engine marks `from` as `completed` and enters `to`
  * according to the target state's kind.
+ *
+ * @template TStates - Union of registered state IDs. Defaults to `string` for
+ *                     the type-erased engine/visualisation layer.
  */
-export interface TransitionDefinition {
+export interface TransitionDefinition<TStates extends string = string> {
   /** ID of the source state. Must be `active` for this transition to fire. */
-  readonly from: string;
+  readonly from: TStates;
   /** ID of the destination state to enter on a successful transition. */
-  readonly to: string;
+  readonly to: TStates;
   /** Action name that triggers evaluation of this transition. */
   readonly on: string;
   /**

@@ -116,7 +116,7 @@ const snapshot = inst.getSnapshot();  // plain JSON — save wherever you want
 - **External wait states** — `WaitState` pauses until `resolveWait` is called
 - **Purely functional persistence** — `getSnapshot()` / `restoreInstance()`, no storage opinions
 - **Typed instance context** — `setContext(schema)` makes context required at `createInstance` time; guards read it via `ctx.context`; `getContext()` returns `TContext | undefined` with no cast
-- **Fully generic type chain** — `WorkflowDefinition<TContext>`, `InstanceSnapshot<TContext>`, `HistoryEntry<TContext>`, `DispatchResult<TContext>` — context type flows end-to-end with no boundary casts
+- **Fully generic type chain** — `WorkflowDefinition<TContext, TStates>`, `InstanceSnapshot<TContext, TStates>`, `HistoryEntry<TContext, TStates>`, `DispatchResult<TContext, TStates, TAction>` — context, state IDs, and action type flow end-to-end with no boundary casts; `WorkflowEngine.dispatch` returns a fully typed result so `WorkflowInstance` needs zero internal casts
 - **Rewind** — `instance.rewind(version)` returns an independent deep-cloned `InstanceSnapshot<TContext>` for any past version, with accurate stateStatuses and context
 - **Typed instance queries** — `getCurrentStates()` returns `TStates[]`; `getAvailableTransitions()` returns `(keyof TActions & string)[]`; state-ID and action-name unions propagate from the builder all the way to the instance
 - **Composable guards** — `Guard.inject`, `Guard.fn`, `Guard.and`, `Guard.or`, `Guard.not`

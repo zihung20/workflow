@@ -140,7 +140,7 @@ async function runStationOpening() {
   console.log();
 
   // ── Step 1: Unlock ───────────────────────────────────────────────────────────
-  let result = await inst.dispatch('UNLOCK_PREMISES', {
+  await inst.dispatch('UNLOCK_PREMISES', {
     staffId: 'SM-042',
     keyCardScanned: true,
     timestamp: new Date().toISOString(),
@@ -148,19 +148,19 @@ async function runStationOpening() {
   console.log(`[1] Premises unlocked — ${inst.getCurrentStates()}`);
 
   // ── Step 2: Safety walk with an issue found ─────────────────────────────────
-  result = await inst.dispatch('COMPLETE_SAFETY_WALK', {
+  const blockedWalk = await inst.dispatch('COMPLETE_SAFETY_WALK', {
     walkedBy: 'SM-042',
     issuesFound: ['Escalator E3 out of service — maintenance called'],
     completedAt: new Date().toISOString(),
   });
-  if (!result.success) {
-    console.log(`[2] Safety walk blocked: reason = "${result.reason}"`);
+  if (!blockedWalk.success) {
+    console.log(`[2] Safety walk blocked: reason = "${blockedWalk.reason}"`);
     console.log(`    Issue must be cleared before proceeding`);
     console.log(`    State unchanged: ${inst.getCurrentStates()}`);
   }
 
   // Issue resolved — walk again with no issues
-  result = await inst.dispatch('COMPLETE_SAFETY_WALK', {
+  await inst.dispatch('COMPLETE_SAFETY_WALK', {
     walkedBy: 'SM-042',
     issuesFound: [],
     completedAt: new Date().toISOString(),
@@ -178,7 +178,7 @@ async function runStationOpening() {
   console.log(`  Restored state: ${restored.getCurrentStates()}`);
 
   // ── Step 3: Activate systems — all must be online ───────────────────────────
-  result = await restored.dispatch('ACTIVATE_SYSTEMS', {
+  await restored.dispatch('ACTIVATE_SYSTEMS', {
     activatedBy: 'SM-042',
     systems: ['power', 'lighting', 'cctv', 'pa', 'ticket-machines', 'escalators'],
     allOnline: true,
@@ -186,7 +186,7 @@ async function runStationOpening() {
   console.log(`\n[4] Systems activated — ${restored.getCurrentStates()}`);
 
   // ── Step 4: Open fare gates ──────────────────────────────────────────────────
-  result = await restored.dispatch('OPEN_FARE_GATES', {
+  await restored.dispatch('OPEN_FARE_GATES', {
     openedBy: 'SM-042',
     gateCount: 8,
   });
@@ -196,7 +196,7 @@ async function runStationOpening() {
   console.log(`\n    Available actions: ${restored.getAvailableTransitions()}`);
 
   // ── Step 5: Commence service ─────────────────────────────────────────────────
-  result = await restored.dispatch('COMMENCE_SERVICE', {
+  await restored.dispatch('COMMENCE_SERVICE', {
     authorisedBy: 'SM-042',
     firstTrainEta: '05:30',
   });

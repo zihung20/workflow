@@ -40,12 +40,13 @@ export class NeverGuard implements IGuard<unknown> {
  * @template T        - The payload type the wrapped function expects.
  * @template TContext - The instance context type the function expects.
  */
-export class FnGuard<T = unknown, TContext = unknown> implements IGuard<unknown> {
-  constructor(private readonly fn: GuardFn<T, TContext>) {}
+export class FnGuard<T = unknown, TContext = unknown, TStates extends string = string> implements IGuard<unknown> {
+  constructor(private readonly fn: GuardFn<T, TContext, TStates>) {}
 
   evaluate(ctx: GuardContext<unknown>): Promise<boolean> {
-    // Cast is safe: the engine validates payload against the action schema
-    // before calling evaluate, and context is the live instance context.
-    return Promise.resolve(this.fn(ctx as GuardContext<T, TContext>));
+    // Cast is safe: the engine validates payload against the action schema before
+    // calling evaluate, context is the live instance context, and all state IDs
+    // in instanceState are registered TStates by construction.
+    return Promise.resolve(this.fn(ctx as GuardContext<T, TContext, TStates>));
   }
 }

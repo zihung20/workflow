@@ -7,25 +7,25 @@ import type { StateStatus } from './state.js';
  * Guards may inspect the live status of any state in the graph but must not
  * mutate instance state — the engine is the sole writer.
  */
-export interface ReadonlyInstanceState {
+export interface ReadonlyInstanceState<TStates extends string = string> {
   readonly instanceId: string;
   readonly workflowName: string;
 
   /** Returns the current `StateStatus` of the given state ID. */
-  getStateStatus(stateId: string): StateStatus;
+  getStateStatus(stateId: TStates): StateStatus;
 
   /** Returns IDs of all states currently in `active` status. */
-  getActiveStates(): readonly string[];
+  getActiveStates(): readonly TStates[];
 
   /** Returns IDs of all states currently in `waiting` status. */
-  getWaitingStates(): readonly string[];
+  getWaitingStates(): readonly TStates[];
 
   /** Returns IDs of all states that have reached `completed` status. */
-  getCompletedStates(): readonly string[];
+  getCompletedStates(): readonly TStates[];
 
-  isStateCompleted(stateId: string): boolean;
-  isStateActive(stateId: string): boolean;
-  isStateWaiting(stateId: string): boolean;
+  isStateCompleted(stateId: TStates): boolean;
+  isStateActive(stateId: TStates): boolean;
+  isStateWaiting(stateId: TStates): boolean;
 }
 
 /**
@@ -35,21 +35,15 @@ export interface ReadonlyInstanceState {
  *                      `InstanceSnapshot`. Defaults to `unknown` for
  *                      type-erased storage (engine, persistence layer).
  */
-export interface HistoryEntry<TContext = unknown> {
+export interface HistoryEntry<TContext = unknown, TStates extends string = string> {
   /** The action name that triggered this transition. */
   readonly action: string;
   /** The Zod-validated payload that was dispatched with the action. */
   readonly payload: unknown;
   /** State IDs that were completed by this transition. */
-  readonly exitedStates: readonly string[];
+  readonly exitedStates: readonly TStates[];
   /** State IDs that became active, waiting, or were auto-activated as a result. */
-  readonly enteredStates: readonly string[];
-  /**
-   * Full state-status map captured immediately after this transition was applied.
-   * Present on all entries written after rewind support was added; absent on
-   * entries from snapshots persisted before that point.
-   */
-  readonly stateStatuses?: Readonly<Record<string, StateStatus>>;
+  readonly enteredStates: readonly TStates[];
   /**
    * Instance context in effect when this transition was dispatched.
    * Used by `WorkflowInstance.rewind()` to restore context at any past version.
@@ -72,7 +66,7 @@ export interface HistoryEntry<TContext = unknown> {
  *                      `WorkflowBuilder.setContext()`. Defaults to `unknown`
  *                      for type-erased storage sites (engine, visualisation).
  */
-export interface InstanceSnapshot<TContext = unknown> {
+export interface InstanceSnapshot<TContext = unknown, TStates extends string = string> {
   readonly instanceId: string;
   readonly workflowName: string;
   /**
@@ -81,9 +75,9 @@ export interface InstanceSnapshot<TContext = unknown> {
    */
   readonly version: number;
   /** Full status map for every state in the workflow. */
-  readonly stateStatuses: Readonly<Record<string, StateStatus>>;
+  readonly stateStatuses: Readonly<Record<TStates, StateStatus>>;
   readonly isTerminal: boolean;
-  readonly history: readonly HistoryEntry<TContext>[];
+  readonly history: readonly HistoryEntry<TContext, TStates>[];
   /**
    * Caller-owned context set via `instance.setContext()`. Persists in the
    * snapshot so it survives `getSnapshot()` / `restoreInstance()` round-trips.
@@ -99,36 +93,54 @@ export interface InstanceSnapshot<TContext = unknown> {
  *
  * @template TContext - Context type of the owning instance. Defaults to `unknown`
  *                      for the type-erased engine layer.
+ * @template TStates  - Union of registered state IDs. Defaults to `string` for
+ *                      the type-erased engine layer. Narrows `enteredStates` and
+ *                      `exitedStates` to the workflow's known state-ID literals.
+ * @template TAction  - The specific action name that was dispatched. Defaults to
+ *                      `string` for the type-erased engine layer.
  */
-export interface TransitionSuccess<TContext = unknown> {
+export interface TransitionSuccess<TContext = unknown, TStates extends string = string, TAction extends string = string> {
   readonly success: true;
   /** The action name that was dispatched. */
-  readonly action: string;
+  readonly action: TAction;
   /** States that became active or waiting as a result of this transition. */
-  readonly enteredStates: readonly string[];
+  readonly enteredStates: readonly TStates[];
   /** States that were completed by this transition. */
-  readonly exitedStates: readonly string[];
+  readonly exitedStates: readonly TStates[];
   /** The updated snapshot after the transition has been applied. */
-  readonly snapshot: InstanceSnapshot<TContext>;
+  readonly snapshot: InstanceSnapshot<TContext, TStates>;
 }
 
 /**
  * Returned by `WorkflowInstance.dispatch()` when the action cannot be applied.
+ *
+ * @template TStates  - Union of registered state IDs. Defaults to `string` for
+ *                      the type-erased engine layer. Narrows `activeStates` to
+ *                      the workflow's known state-ID literals.
+ * @template TAction  - The specific action name that was dispatched. Defaults to
+ *                      `string` for the type-erased engine layer.
  */
-export interface TransitionBlocked {
+export interface TransitionBlocked<TStates extends string = string, TAction extends string = string> {
   readonly success: false;
-  readonly action: string;
+  /** The action name that was dispatched. */
+  readonly action: TAction;
   readonly reason:
     | 'terminal-state' // workflow has already reached a terminal state
     | 'invalid-action' // no transition exists for this action from any active state
     | 'guard-failed' // a matching transition exists but its guard blocked it
     | 'no-active-source'; // the action's source state is not currently active
-  readonly activeStates: readonly string[];
+  readonly activeStates: readonly TStates[];
 }
 
 /**
  * Discriminated union returned by every `dispatch` call.
  *
  * @template TContext - Context type of the owning instance. Defaults to `unknown`.
+ * @template TStates  - Union of registered state IDs. Defaults to `string` for the
+ *                      type-erased engine layer.
+ * @template TAction  - The specific action name that was dispatched. Defaults to
+ *                      `string` for the type-erased engine layer.
  */
-export type DispatchResult<TContext = unknown> = TransitionSuccess<TContext> | TransitionBlocked;
+export type DispatchResult<TContext = unknown, TStates extends string = string, TAction extends string = string> =
+  | TransitionSuccess<TContext, TStates, TAction>
+  | TransitionBlocked<TStates, TAction>;

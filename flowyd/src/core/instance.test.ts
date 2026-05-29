@@ -272,6 +272,202 @@ describe('WorkflowInstance — rewind', () => {
   });
 });
 
+function makeFork() {
+  return createWorkflow({ name: 'fork-wf' })
+    .defineAction('START', Empty)
+    .defineAction('DONE_A', Empty)
+    .defineAction('DONE_B', Empty)
+    .defineAction('FINISH', Empty)
+    .addStep('start')
+    .addStep('branch-a')
+    .addStep('branch-b')
+    .addFork('fork', { targets: ['branch-a', 'branch-b'] })
+    .addJoin('join', { requires: ['branch-a', 'branch-b'], mode: 'all' })
+    .addStep('end')
+    .setInitial('start')
+    .setTerminal(['end'])
+    .addTransition({ from: 'start', to: 'fork', on: 'START' })
+    .addTransition({ from: 'branch-a', to: 'join', on: 'DONE_A' })
+    .addTransition({ from: 'branch-b', to: 'join', on: 'DONE_B' })
+    .addTransition({ from: 'join', to: 'end', on: 'FINISH' })
+    .build();
+}
+
+describe('WorkflowInstance — rewind (delta replay)', () => {
+  it('rewind replays a WaitState as Waiting', async () => {
+    const wf = makeWait();
+    const inst = wf.createInstance('rw-w-001');
+    await inst.dispatch('START', {});
+    // at version 1: sub is waiting
+    const at1 = inst.rewind(1);
+    expect(at1.stateStatuses['sub']).toBe(StateStatus.Waiting);
+    expect(at1.stateStatuses['start']).toBe(StateStatus.Completed);
+    expect(at1.stateStatuses['end']).toBe(StateStatus.Idle);
+  });
+
+  it('rewind replays resolveWait as Active (not Waiting)', async () => {
+    const wf = makeWait();
+    const inst = wf.createInstance('rw-w-002');
+    await inst.dispatch('START', {});  // v1: sub=Waiting
+    inst.resolveWait('sub');           // v2: sub=Active
+    const at2 = inst.rewind(2);
+    expect(at2.stateStatuses['sub']).toBe(StateStatus.Active);
+  });
+
+  it('rewind to version before resolveWait still shows Waiting', async () => {
+    const wf = makeWait();
+    const inst = wf.createInstance('rw-w-003');
+    await inst.dispatch('START', {});
+    inst.resolveWait('sub');
+    const at1 = inst.rewind(1);
+    expect(at1.stateStatuses['sub']).toBe(StateStatus.Waiting);
+  });
+
+  it('rewind correctly replays parallel branches mid-execution', async () => {
+    const wf = makeFork();
+    const inst = wf.createInstance('rw-f-001');
+    await inst.dispatch('START', {});   // v1: branch-a and branch-b both active
+    await inst.dispatch('DONE_A', {});  // v2: branch-a completed, join still idle
+
+    const at1 = inst.rewind(1);
+    expect(at1.stateStatuses['branch-a']).toBe(StateStatus.Active);
+    expect(at1.stateStatuses['branch-b']).toBe(StateStatus.Active);
+    expect(at1.stateStatuses['join']).toBe(StateStatus.Idle);
+
+    const at2 = inst.rewind(2);
+    expect(at2.stateStatuses['branch-a']).toBe(StateStatus.Completed);
+    expect(at2.stateStatuses['branch-b']).toBe(StateStatus.Active);
+    expect(at2.stateStatuses['join']).toBe(StateStatus.Idle);
+  });
+
+  it('rewind shows join as Active only after all branches complete', async () => {
+    const wf = makeFork();
+    const inst = wf.createInstance('rw-f-002');
+    await inst.dispatch('START', {});
+    await inst.dispatch('DONE_A', {});
+    await inst.dispatch('DONE_B', {});  // v3: join becomes Active
+
+    const at3 = inst.rewind(3);
+    expect(at3.stateStatuses['join']).toBe(StateStatus.Active);
+    expect(at3.stateStatuses['branch-a']).toBe(StateStatus.Completed);
+    expect(at3.stateStatuses['branch-b']).toBe(StateStatus.Completed);
+  });
+
+  it('unreached states are Idle in any rewound version', async () => {
+    const wf = makeThreeStep();
+    const inst = wf.createInstance('rw-idle-001');
+    await inst.dispatch('NEXT', {});  // a→b; c still idle
+
+    const at1 = inst.rewind(1);
+    expect(at1.stateStatuses['c']).toBe(StateStatus.Idle);
+  });
+});
+
+describe('WorkflowInstance — typed dispatch result (TStates)', () => {
+  it('enteredStates contains the state that became active', async () => {
+    const wf = makeLinear();
+    const inst = wf.createInstance('dr-001');
+    const result = await inst.dispatch('GO', {});
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.enteredStates).toContain('b');
+      expect(result.exitedStates).toContain('a');
+    }
+  });
+
+  it('exitedStates contains the source state that was completed', async () => {
+    const wf = makeThreeStep();
+    const inst = wf.createInstance('dr-002');
+    const result = await inst.dispatch('NEXT', {});
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.exitedStates).toEqual(['a']);
+      expect(result.enteredStates).toEqual(['b']);
+    }
+  });
+
+  it('enteredStates includes all parallel branches after a fork', async () => {
+    const wf = makeFork();
+    const inst = wf.createInstance('dr-003');
+    const result = await inst.dispatch('START', {});
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.enteredStates).toContain('branch-a');
+      expect(result.enteredStates).toContain('branch-b');
+    }
+  });
+
+  it('enteredStates includes join when it auto-activates', async () => {
+    const wf = makeFork();
+    const inst = wf.createInstance('dr-004');
+    await inst.dispatch('START', {});
+    await inst.dispatch('DONE_A', {});
+    const result = await inst.dispatch('DONE_B', {});
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.enteredStates).toContain('join');
+    }
+  });
+
+  it('blocked result activeStates lists currently active states', async () => {
+    const wf = makeLinear();
+    const inst = wf.createInstance('dr-005');
+    // Dispatch an action with no matching transition from the current state
+    const result = await inst.dispatch('GO', {});
+    // Now terminal — next dispatch must block
+    expect(result.success).toBe(true);
+    const blocked = await inst.dispatch('GO', {});
+    expect(blocked.success).toBe(false);
+    if (!blocked.success) {
+      expect(blocked.activeStates).toContain('b');
+    }
+  });
+
+  it('enteredStates and exitedStates typed as TStates[] — compile-time check', () => {
+    const inst = makeLinear().createInstance('dr-ct-001');
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    async function _typeOnly() {
+      const result = await inst.dispatch('GO', {});
+      if (result.success) {
+        // 'a' and 'b' are the only valid TStates — this must compile
+        const _entered: ('a' | 'b')[] = [...result.enteredStates];
+        const _exited: ('a' | 'b')[] = [...result.exitedStates];
+        // @ts-expect-error 'unknown-state' is not a registered state ID
+        const _bad: ('a' | 'b')[] = ['unknown-state'];
+        void _entered; void _exited; void _bad;
+      }
+    }
+    expect(inst).toBeDefined();
+  });
+
+  it('activeStates in TransitionBlocked typed as TStates[] — compile-time check', () => {
+    const inst = makeLinear().createInstance('dr-ct-002');
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    async function _typeOnly() {
+      const result = await inst.dispatch('GO', {});
+      if (!result.success) {
+        const _active: ('a' | 'b')[] = [...result.activeStates];
+        void _active;
+      }
+    }
+    expect(inst).toBeDefined();
+  });
+
+  it('action field on result is typed as the dispatched action literal — compile-time check', () => {
+    const inst = makeLinear().createInstance('dr-ct-003');
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    async function _typeOnly() {
+      const result = await inst.dispatch('GO', {});
+      // result.action must be typed as 'GO', not just string
+      const _action: 'GO' = result.action;
+      // @ts-expect-error 'OTHER' is not the dispatched action
+      const _bad: 'OTHER' = result.action;
+      void _action; void _bad;
+    }
+    expect(inst).toBeDefined();
+  });
+});
+
 describe('WorkflowInstance — payload strictness', () => {
   // Type-only tests: the async helpers below are never called at runtime.
   // TypeScript still checks their bodies, so unused @ts-expect-error directives

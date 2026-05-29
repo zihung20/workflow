@@ -18,6 +18,7 @@ type Exact<Base, Given extends Base> = Given & { [K in Exclude<keyof Given, keyo
 import { StateStatus, StateKind } from '../types/index.js';
 import { GuardRegistry } from './registry.js';
 import { WorkflowEngine } from './engine.js';
+import { typedEntries } from './utils.js';
 
 /**
  * Mutable runtime state for a single SOP execution.
@@ -44,8 +45,8 @@ export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unkn
 
   /** @internal Created exclusively by `Workflow._createInstance` and `Workflow._restoreInstance`. */
   constructor(
-    private readonly definition: WorkflowDefinition<TContext>,
-    private snapshot: InstanceSnapshot<TContext>,
+    private readonly definition: WorkflowDefinition<TContext, TStates>,
+    private snapshot: InstanceSnapshot<TContext, TStates>,
   ) {}
 
   /**
@@ -59,8 +60,9 @@ export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unkn
    * @param fn   - The guard implementation. Annotate `TPayload` to match the
    *               payload type of the action(s) this guard is attached to.
    */
-  injectGuard<TPayload = unknown, TCtx = unknown>(name: string, fn: GuardFn<TPayload, TCtx>): this {
-    this.guardRegistry.register(name, fn);
+  injectGuard<TPayload = unknown, TCtx = unknown>(name: string, fn: GuardFn<TPayload, TCtx, TStates>): this {
+    // Registry is type-erased (GuardFn<unknown>); TStates is asserted correct by construction.
+    this.guardRegistry.register(name, fn as GuardFn<TPayload, TCtx>);
     return this;
   }
 
@@ -195,7 +197,7 @@ export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unkn
   async dispatch<K extends keyof TActions & string, P extends TActions[K]>(
     action: K,
     payload: Exact<TActions[K], P>,
-  ): Promise<DispatchResult<TContext>>;
+  ): Promise<DispatchResult<TContext, TStates, K>>;
 
   /**
    * @internal Overload used by `canExecute` to perform a dry-run without
@@ -205,13 +207,13 @@ export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unkn
     action: K,
     payload: TActions[K],
     dryRun: boolean,
-  ): Promise<DispatchResult<TContext>>;
+  ): Promise<DispatchResult<TContext, TStates, K>>;
 
   async dispatch<K extends keyof TActions & string>(
     action: K,
     payload: TActions[K],
     dryRun = false,
-  ): Promise<DispatchResult<TContext>> {
+  ): Promise<DispatchResult<TContext, TStates, K>> {
     const schema = this.definition.actionSchemas.get(action);
     if (!schema) {
       throw new Error(`Action "${action}" is not registered in workflow "${this.definition.name}"`);
@@ -219,7 +221,7 @@ export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unkn
 
     const validatedPayload = schema.parse(payload);
 
-    const result = await WorkflowEngine.dispatch(
+    const result = await WorkflowEngine.dispatch<TContext, TStates, K>(
       this.definition,
       this.buildReadonlyView(),
       this.guardRegistry,
@@ -249,7 +251,7 @@ export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unkn
    * @throws {Error} If the state is not a `WaitState` or is not currently
    *                 in `waiting` status.
    */
-  resolveWait(stateId: string, externalSnapshot?: InstanceSnapshot): void {
+  resolveWait(stateId: TStates, externalSnapshot?: InstanceSnapshot): void {
     const state = this.definition.states.get(stateId);
     if (!state || state.kind !== StateKind.Wait) {
       throw new Error(`State "${stateId}" is not a WaitState`);
@@ -262,18 +264,18 @@ export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unkn
       );
     }
 
+    // Cast is safe: spreading Record<TStates, StateStatus> and overwriting one TStates key.
     const updatedStatuses = {
       ...this.snapshot.stateStatuses,
       [stateId]: StateStatus.Active,
-    };
+    } as Readonly<Record<TStates, StateStatus>>;
 
     const ctx = this.snapshot.context;
-    const historyEntry: HistoryEntry<TContext> = {
+    const historyEntry: HistoryEntry<TContext, TStates> = {
       action: `__resolve_wait:${stateId}`,
       payload: externalSnapshot ?? null,
       exitedStates: [],
       enteredStates: [stateId],
-      stateStatuses: updatedStatuses,
       at: new Date().toISOString(),
       ...(ctx !== undefined && { context: ctx }),
     };
@@ -295,7 +297,7 @@ export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unkn
    *
    * @returns An `InstanceSnapshot<TContext>` capturing the full current state.
    */
-  getSnapshot(): InstanceSnapshot<TContext> {
+  getSnapshot(): InstanceSnapshot<TContext, TStates> {
     return structuredClone(this.snapshot);
   }
 
@@ -303,6 +305,10 @@ export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unkn
    * Returns an independent deep-cloned snapshot of what the instance looked like
    * at the given version. Mutations to the returned object do not affect the live
    * instance.
+   *
+   * Reconstructs state by replaying the `exitedStates`/`enteredStates` deltas
+   * from every history entry up to `version`. Cost is O(version) — acceptable
+   * for a debugging or audit tool that is never called in a hot path.
    *
    * **Context accuracy**: each history entry records the context that was active
    * at the time of the corresponding dispatch, so `rewind(N).context` reflects
@@ -316,10 +322,8 @@ export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unkn
    *                  equivalent to calling `getSnapshot()`.
    * @returns A complete `InstanceSnapshot<TContext>` for the requested version.
    * @throws {Error} If `version` is outside `[0, currentVersion]`.
-   * @throws {Error} If a required history entry has no `stateStatuses` record,
-   *                 meaning the snapshot predates rewind support.
    */
-  rewind(version: number): InstanceSnapshot<TContext> {
+  rewind(version: number): InstanceSnapshot<TContext, TStates> {
     const current = this.snapshot.version;
     if (version < 0 || version > current) {
       throw new Error(
@@ -331,63 +335,72 @@ export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unkn
       return this.getSnapshot();
     }
 
-    if (version === 0) {
-      const stateStatuses: Record<string, StateStatus> = {};
-      for (const id of this.definition.states.keys()) {
-        stateStatuses[id] = StateStatus.Idle;
-      }
-      stateStatuses[this.definition.initialStateId] = StateStatus.Active;
+    // Build the initial status map: every state idle, initial state active.
+    const stateStatuses: Record<string, StateStatus> = {};
+    for (const id of this.definition.states.keys()) {
+      stateStatuses[id] = StateStatus.Idle;
+    }
+    stateStatuses[this.definition.initialStateId] = StateStatus.Active;
 
+    // Cast is safe: stateStatuses is populated exclusively from registered state IDs,
+    // all of which are members of TStates by construction.
+    const typedStatuses = stateStatuses as Readonly<Record<TStates, StateStatus>>;
+
+    if (version === 0) {
       // Use context from the first history entry if it exists (captures what was
       // set before the first dispatch), otherwise fall back to the current context.
       const contextAtV0 = this.snapshot.history[0]?.context ?? this.snapshot.context;
-
-      const base: InstanceSnapshot<TContext> = {
+      const base: InstanceSnapshot<TContext, TStates> = {
         instanceId: this.snapshot.instanceId,
         workflowName: this.snapshot.workflowName,
         version: 0,
-        stateStatuses,
+        stateStatuses: typedStatuses,
         isTerminal: false,
         history: [],
         createdAt: this.snapshot.createdAt,
         updatedAt: this.snapshot.createdAt,
       };
-      const result: InstanceSnapshot<TContext> =
+      const result: InstanceSnapshot<TContext, TStates> =
         contextAtV0 !== undefined ? { ...base, context: contextAtV0 } : base;
       return structuredClone(result);
     }
 
-    const entry = this.snapshot.history[version - 1];
-    if (entry === undefined) {
-      throw new Error(`Internal: no history entry at index ${version - 1}`);
-    }
-    const { stateStatuses } = entry;
-    if (stateStatuses === undefined) {
-      throw new Error(
-        `Cannot rewind to version ${version}: history entry has no stateStatuses. ` +
-          `The snapshot may predate rewind support.`,
-      );
+    // Replay the exitedStates/enteredStates deltas from each history entry in order.
+    // resolveWait promotes a WaitState from Waiting → Active; all other entries derive
+    // the entered status from the state's kind.
+    for (const entry of this.snapshot.history.slice(0, version)) {
+      for (const id of entry.exitedStates) {
+        stateStatuses[id] = StateStatus.Completed;
+      }
+      for (const id of entry.enteredStates) {
+        const isResolveWait = entry.action.startsWith('__resolve_wait:');
+        const state = this.definition.states.get(id);
+        stateStatuses[id] =
+          !isResolveWait && state?.kind === StateKind.Wait
+            ? StateStatus.Waiting
+            : StateStatus.Active;
+      }
     }
 
     const isTerminal = this.definition.terminalStateIds.some(
       (id) => stateStatuses[id] === StateStatus.Active,
     );
 
-    // Context at version N is what was in effect when dispatch N fired, recorded in
-    // history[N-1].context. Falls back to current context for pre-rewind-support snapshots.
+    const entry = this.snapshot.history[version - 1]!;
+    // Context at version N is what was in effect when dispatch N fired, recorded in history[N-1].context.
     const contextAtN = entry.context ?? this.snapshot.context;
 
-    const base: InstanceSnapshot<TContext> = {
+    const base: InstanceSnapshot<TContext, TStates> = {
       instanceId: this.snapshot.instanceId,
       workflowName: this.snapshot.workflowName,
       version,
-      stateStatuses,
+      stateStatuses: typedStatuses,
       isTerminal,
       history: this.snapshot.history.slice(0, version),
       createdAt: this.snapshot.createdAt,
       updatedAt: entry.at,
     };
-    const result: InstanceSnapshot<TContext> =
+    const result: InstanceSnapshot<TContext, TStates> =
       contextAtN !== undefined ? { ...base, context: contextAtN } : base;
     return structuredClone(result);
   }
@@ -398,32 +411,34 @@ export class WorkflowInstance<TActions extends ActionPayloadMap, TContext = unkn
    * Constructs the `ReadonlyInstanceState` view passed to the engine and guards.
    * This view reflects the state at the time of each `dispatch` call.
    */
-  private buildReadonlyView(): ReadonlyInstanceState {
+  private buildReadonlyView(): ReadonlyInstanceState<TStates> {
     const statuses = this.snapshot.stateStatuses;
     const instanceId = this.snapshot.instanceId;
     const workflowName = this.snapshot.workflowName;
 
-    const getStatus = (id: string): StateStatus => statuses[id] ?? StateStatus.Idle;
+    // stateStatuses is Record<TStates, StateStatus> — keyed access returns StateStatus | undefined
+    // under noUncheckedIndexedAccess for dynamic (string) TStates, hence the ?? fallback.
+    const getStatus = (id: TStates): StateStatus => statuses[id] ?? StateStatus.Idle;
 
     return {
       instanceId,
       workflowName,
       getStateStatus: getStatus,
       getActiveStates: () =>
-        Object.entries(statuses)
+        typedEntries(statuses)
           .filter(([, s]) => s === StateStatus.Active)
           .map(([id]) => id),
       getWaitingStates: () =>
-        Object.entries(statuses)
+        typedEntries(statuses)
           .filter(([, s]) => s === StateStatus.Waiting)
           .map(([id]) => id),
       getCompletedStates: () =>
-        Object.entries(statuses)
+        typedEntries(statuses)
           .filter(([, s]) => s === StateStatus.Completed)
           .map(([id]) => id),
-      isStateCompleted: (id: string) => getStatus(id) === StateStatus.Completed,
-      isStateActive: (id: string) => getStatus(id) === StateStatus.Active,
-      isStateWaiting: (id: string) => getStatus(id) === StateStatus.Waiting,
+      isStateCompleted: (id: TStates) => getStatus(id) === StateStatus.Completed,
+      isStateActive: (id: TStates) => getStatus(id) === StateStatus.Active,
+      isStateWaiting: (id: TStates) => getStatus(id) === StateStatus.Waiting,
     };
   }
 }

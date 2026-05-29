@@ -10,21 +10,22 @@ import type {
 } from '../types/index.js';
 import { StateKind, StateStatus } from '../types/index.js';
 import type { GuardRegistry } from './registry.js';
+import { typedEntries, typedFromEntries } from './utils.js';
 
 /**
  * Intermediate, mutable state map computed during a single engine evaluation.
  * Never exposed outside this module.
  */
-type MutableStatusMap = Map<string, StateStatus>;
+type MutableStatusMap<TStates extends string = string> = Map<TStates, StateStatus>;
 
 /**
  * Result of a single engine evaluation cycle, before it is committed to the
  * instance.
  */
-interface EvaluationResult {
-  readonly newStatuses: MutableStatusMap;
-  readonly enteredStates: string[];
-  readonly exitedStates: string[];
+interface EvaluationResult<TStates extends string = string> {
+  readonly newStatuses: MutableStatusMap<TStates>;
+  readonly enteredStates: TStates[];
+  readonly exitedStates: TStates[];
 }
 
 /**
@@ -40,9 +41,9 @@ export class WorkflowEngine {
   /**
    * Evaluates a dispatched action against the current instance state.
    *
-   * `TContext` is inferred from `currentSnapshot` so the returned snapshot and
-   * history entries carry the same context type as the caller's snapshot — no
-   * cast required when assigning the result back to a typed `WorkflowInstance`.
+   * `TContext` is inferred from `currentSnapshot`, `TStates` from `definition`,
+   * and `TAction` from `action` so the returned `DispatchResult` is fully typed
+   * at the call site — no cast required in `WorkflowInstance.dispatch`.
    *
    * @param definition      - The immutable compiled workflow graph.
    * @param instanceState   - Read-only view of the current instance state.
@@ -51,20 +52,20 @@ export class WorkflowEngine {
    * @param action          - The action name being dispatched.
    * @param payload         - The Zod-validated action payload.
    * @param context         - The accumulated instance context, passed through to guards.
-   * @returns A `DispatchResult<TContext>` discriminated union. On success, includes the
-   *          updated snapshot and lists of entered/exited states.
+   * @returns A `DispatchResult<TContext, TStates, TAction>` discriminated union. On success,
+   *          includes the updated snapshot and lists of entered/exited states.
    * @throws Any error thrown by a guard's `evaluate()` method — guard errors
    *         are not caught by the engine and propagate directly to the caller.
    */
-  static async dispatch<TContext>(
-    definition: WorkflowDefinition,
-    instanceState: ReadonlyInstanceState,
+  static async dispatch<TContext, TStates extends string = string, TAction extends string = string>(
+    definition: WorkflowDefinition<TContext, TStates>,
+    instanceState: ReadonlyInstanceState<TStates>,
     guardRegistry: GuardRegistry,
-    currentSnapshot: InstanceSnapshot<TContext>,
-    action: string,
+    currentSnapshot: InstanceSnapshot<TContext, TStates>,
+    action: TAction,
     payload: unknown,
     context: TContext | undefined,
-  ): Promise<DispatchResult<TContext>> {
+  ): Promise<DispatchResult<TContext, TStates, TAction>> {
     if (currentSnapshot.isTerminal) {
       return {
         success: false,
@@ -89,10 +90,12 @@ export class WorkflowEngine {
     }
 
     const guardCtx = WorkflowEngine.buildGuardContext(payload, instanceState, guardRegistry, context);
-    const passing: TransitionDefinition[] = [];
+    const passing: TransitionDefinition<TStates>[] = [];
 
     for (const candidate of candidates) {
-      const allowed = candidate.guard ? await candidate.guard.evaluate(guardCtx) : true;
+      // Cast is safe: IGuard.evaluate is the type-erased guard boundary;
+      // FnGuard re-narrows to the concrete payload/context/state types via its own cast.
+      const allowed = candidate.guard ? await candidate.guard.evaluate(guardCtx as GuardContext<unknown>) : true;
       if (allowed) {
         passing.push(candidate);
       }
@@ -117,24 +120,19 @@ export class WorkflowEngine {
       (id) => result.newStatuses.get(id) === StateStatus.Active,
     );
 
-    const updatedStatuses: Record<string, StateStatus> = {};
-    for (const [id, status] of result.newStatuses) {
-      updatedStatuses[id] = status;
-    }
+    const updatedStatuses = typedFromEntries(result.newStatuses);
 
-    // Conditional spread satisfies exactOptionalPropertyTypes: context?: TContext
-    // disallows explicit undefined, so we only include the field when it is set.
-    const historyEntry: HistoryEntry<TContext> = {
+    // HistoryEntry.action is string; TAction extends string so this assignment is valid.
+    const historyEntry: HistoryEntry<TContext, TStates> = {
       action,
       payload,
       exitedStates: result.exitedStates,
       enteredStates: result.enteredStates,
-      stateStatuses: updatedStatuses,
       at: new Date().toISOString(),
       ...(context !== undefined && { context }),
     };
 
-    const updatedSnapshot: InstanceSnapshot<TContext> = {
+    const updatedSnapshot: InstanceSnapshot<TContext, TStates> = {
       ...currentSnapshot,
       version: currentSnapshot.version + 1,
       stateStatuses: updatedStatuses,
@@ -159,14 +157,14 @@ export class WorkflowEngine {
    * The algorithm runs in a fixed-point loop: after applying direct transitions
    * it keeps re-evaluating JoinStates until no more automatically activate.
    */
-  private static computeTransitions(
-    transitions: TransitionDefinition[],
-    definition: WorkflowDefinition,
-    currentStatuses: Readonly<Record<string, StateStatus>>,
-  ): EvaluationResult {
-    const newStatuses: MutableStatusMap = new Map(Object.entries(currentStatuses));
-    const enteredStates: string[] = [];
-    const exitedStates: string[] = [];
+  private static computeTransitions<TStates extends string>(
+    transitions: TransitionDefinition<TStates>[],
+    definition: WorkflowDefinition<unknown, TStates>,
+    currentStatuses: Readonly<Record<TStates, StateStatus>>,
+  ): EvaluationResult<TStates> {
+    const newStatuses: MutableStatusMap<TStates> = new Map(typedEntries(currentStatuses));
+    const enteredStates: TStates[] = [];
+    const exitedStates: TStates[] = [];
 
     for (const t of transitions) {
       newStatuses.set(t.from, StateStatus.Completed);
@@ -204,11 +202,11 @@ export class WorkflowEngine {
    * - `JoinState` → deferred; handled by the fixed-point join-check loop
    * - `WaitState` → `waiting`
    */
-  private static enterState(
-    stateId: string,
-    definition: WorkflowDefinition,
-    statuses: MutableStatusMap,
-    entered: string[],
+  private static enterState<TStates extends string>(
+    stateId: TStates,
+    definition: WorkflowDefinition<unknown, TStates>,
+    statuses: MutableStatusMap<TStates>,
+    entered: TStates[],
   ): void {
     const state = definition.states.get(stateId);
     if (!state) {
@@ -225,7 +223,8 @@ export class WorkflowEngine {
         // ForkState is transient — complete it immediately and fan out to targets
         statuses.set(stateId, StateStatus.Completed);
         for (const target of state.targets) {
-          WorkflowEngine.enterState(target, definition, statuses, entered);
+          // Cast is safe: ForkState.targets are validated at build() to be registered states (TStates by construction).
+          WorkflowEngine.enterState(target as TStates, definition, statuses, entered);
         }
         break;
       }
@@ -246,9 +245,13 @@ export class WorkflowEngine {
    * Evaluates whether a `JoinState`'s completion threshold has been reached
    * given the current (possibly mid-transition) status map.
    */
-  private static joinConditionMet(join: IJoinState, statuses: MutableStatusMap): boolean {
+  private static joinConditionMet<TStates extends string>(
+    join: IJoinState,
+    statuses: MutableStatusMap<TStates>,
+  ): boolean {
     const completedCount = join.requires.filter(
-      (id) => statuses.get(id) === StateStatus.Completed,
+      // Cast is safe: IJoinState.requires are validated at build() to be registered TStates IDs.
+      (id) => statuses.get(id as TStates) === StateStatus.Completed,
     ).length;
 
     if (join.mode === 'all') {
@@ -267,12 +270,12 @@ export class WorkflowEngine {
    * instance state view, and the guard resolution function for `InjectedGuard`
    * lookups.
    */
-  private static buildGuardContext(
+  private static buildGuardContext<TStates extends string>(
     payload: unknown,
-    instanceState: ReadonlyInstanceState,
+    instanceState: ReadonlyInstanceState<TStates>,
     guardRegistry: GuardRegistry,
     context: unknown,
-  ): GuardContext<unknown> {
+  ): GuardContext<unknown, unknown, TStates> {
     return {
       payload,
       context,

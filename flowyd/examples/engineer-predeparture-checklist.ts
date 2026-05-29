@@ -137,7 +137,7 @@ async function runChecklist() {
   const instance = engineerChecklist.createInstance('ENG-042-20240520-0600');
 
   // Step 1: Morning briefing
-  let result = await instance.dispatch('BRIEFING_RECEIVED', {
+  await instance.dispatch('BRIEFING_RECEIVED', {
     trainId: 'ENG-042',
     routeCode: 'NS1',
     shiftTime: '06:00',
@@ -145,24 +145,24 @@ async function runChecklist() {
   console.log(`[1] Briefing received — state: ${instance.getCurrentStates()}`);
 
   // Step 2: Kick off parallel inspections
-  result = await instance.dispatch('START_INSPECTION', {});
+  await instance.dispatch('START_INSPECTION', {});
   console.log(`[2] Inspections started — active: ${instance.getCurrentStates()}`);
   // → 3 streams are now active simultaneously
 
   // Step 3: Each technician clears their stream (order doesn't matter)
-  result = await instance.dispatch('ELEC_OK', {
+  await instance.dispatch('ELEC_OK', {
     technicianId: 'ELEC-7',
     notes: 'All circuits nominal, no fault codes',
   });
   console.log(`[3] Electrical cleared — active: ${instance.getCurrentStates()}`);
 
-  result = await instance.dispatch('SAFETY_OK', {
+  await instance.dispatch('SAFETY_OK', {
     technicianId: 'SAFE-3',
     notes: 'Emergency brakes, door interlocks, CCTV OK',
   });
   console.log(`[4] Safety systems cleared — active: ${instance.getCurrentStates()}`);
 
-  result = await instance.dispatch('MECH_OK', {
+  await instance.dispatch('MECH_OK', {
     technicianId: 'MECH-12',
     notes: 'Bogie, couplings, pantograph — all within spec',
   });
@@ -170,18 +170,18 @@ async function runChecklist() {
   // JoinState auto-activates once all three complete
 
   // Step 4: Engineer signs off
-  result = await instance.dispatch('SIGN_OFF', {
+  await instance.dispatch('SIGN_OFF', {
     engineerId: 'ENG-042',
     certifies: true,
   });
   console.log(`[6] Signed off — state: ${instance.getCurrentStates()}`);
 
   // Step 5: Depart
-  result = await instance.dispatch('DEPART', {
+  const departResult = await instance.dispatch('DEPART', {
     platform: 3,
     scheduledAt: '2024-05-20T06:00:00+08:00',
   });
-  if (result.success) {
+  if (departResult.success) {
     console.log(`[7] Departed platform 3 ✓`);
     console.log(`\nWorkflow terminal: ${instance.isTerminal()}`);
     console.log(`History entries: ${instance.getSnapshot().history.length}`);

@@ -5,6 +5,7 @@ import type {
   WorkflowDefinition,
   IGuard,
   GuardFn,
+  AnyState,
 } from '../types/index.js';
 import type { JoinMode } from '../types/state.js';
 import { StateKind } from '../types/index.js';
@@ -272,13 +273,13 @@ export class WorkflowBuilder<
     readonly from: TStates;
     readonly to: TStates;
     readonly on: K;
-    readonly guard?: IGuard<TActions[K]> | GuardFn<TActions[K], TContext>;
+    readonly guard?: IGuard<TActions[K]> | GuardFn<TActions[K], TContext, TStates>;
   }): this {
     const guard: IGuard<unknown> | undefined =
       transition.guard === undefined
         ? undefined
         : typeof transition.guard === 'function'
-          ? new FnGuard(transition.guard)
+          ? new FnGuard<TActions[K], TContext, TStates>(transition.guard)
           : transition.guard;
 
     // exactOptionalPropertyTypes requires the property to be absent rather than
@@ -357,17 +358,23 @@ export class WorkflowBuilder<
       }
     }
 
-    // contextSchema is stored as ZodSchema<unknown> because the builder accumulates
-    // TContext via setContext<C>() which casts `this` to a new type. At build() time
-    // TContext is sealed, so casting the stored schema to ZodSchema<TContext> is safe.
-    const definition: WorkflowDefinition<TContext> = {
+    // All four casts below are safe by registration invariant: `build()` has already
+    // verified every ID appears in `states`. The builder's internal storage is
+    // type-erased (`string`) because `TStates` accumulates via type-level widening,
+    // not runtime branching. At `build()` time TStates and TContext are sealed.
+    const definition: WorkflowDefinition<TContext, TStates> = {
       name: this.name,
-      states,
-      transitions: [...this.transitions],
+      // StateRegistry is type-erased; all stored IDs are TStates by construction.
+      states: states as ReadonlyMap<TStates, AnyState>,
+      // addTransition constrains from/to to TStates at the type level.
+      transitions: [...this.transitions] as TransitionDefinition<TStates>[],
       actionSchemas: new Map(this.actionSchemas),
-      initialStateId: this.initialStateId,
-      terminalStateIds: [...this.terminalStateIds],
+      // setInitial validates the ID is a registered state (a TStates member).
+      initialStateId: this.initialStateId as TStates,
+      // setTerminal validates all IDs are registered (TStates members).
+      terminalStateIds: [...this.terminalStateIds] as TStates[],
       ...(this.contextSchema !== undefined && {
+        // contextSchema stored as ZodSchema<unknown>; TContext is sealed at build() time.
         contextSchema: this.contextSchema as ZodSchema<TContext>,
       }),
     };

@@ -22,4 +22,11 @@ export default defineWorkspace([
       environment: 'node',
     },
   },
+  {
+    test: {
+      name: 'perf',
+      include: ['tests/perf/**/*.test.ts'],
+      environment: 'node',
+    },
+  },
 ]);

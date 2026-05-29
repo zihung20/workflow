@@ -9,7 +9,7 @@ import type { ReadonlyInstanceState } from './instance.js';
  *                      set via `instance.setContext()`. Defaults to `unknown`
  *                      when no context schema has been declared.
  */
-export interface GuardContext<TPayload, TContext = unknown> {
+export interface GuardContext<TPayload, TContext = unknown, TStates extends string = string> {
   /** The Zod-validated action payload. Typed to the specific action's schema. */
   readonly payload: TPayload;
 
@@ -26,7 +26,7 @@ export interface GuardContext<TPayload, TContext = unknown> {
    * Use this to write guards that depend on other steps being completed
    * (e.g. `ctx.instanceState.isStateCompleted('legal-review')`).
    */
-  readonly instanceState: ReadonlyInstanceState;
+  readonly instanceState: ReadonlyInstanceState<TStates>;
 
   /**
    * Resolves a named guard function registered via `instance.injectGuard()`.
@@ -66,4 +66,4 @@ export interface IGuard<TPayload = unknown> {
  *                      used as an inline guard on `addTransition`. Annotate
  *                      explicitly when used with `Guard.fn<TPayload, TContext>()`.
  */
-export type GuardFn<TPayload, TContext = unknown> = (ctx: GuardContext<TPayload, TContext>) => boolean | Promise<boolean>;
+export type GuardFn<TPayload, TContext = unknown, TStates extends string = string> = (ctx: GuardContext<TPayload, TContext, TStates>) => boolean | Promise<boolean>;

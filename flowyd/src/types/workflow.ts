@@ -11,23 +11,25 @@ export type ActionPayloadMap = Record<string, unknown>;
 /**
  * Compiled, immutable representation of a workflow definition.
  *
- * The engine and visualisation layer use the default `WorkflowDefinition`
- * (= `WorkflowDefinition<unknown>`) which is effectively type-erased.
- * `Workflow<TActions, TContext>` and `WorkflowInstance<TActions, TContext>`
- * hold `WorkflowDefinition<TContext>` so that `contextSchema.parse()` returns
- * `TContext` directly rather than `unknown`, removing the need for boundary casts.
+ * `WorkflowDefinition` (= `WorkflowDefinition<unknown, string>`) is the
+ * type-erased form used by the visualisation layer. `Workflow<TActions, TContext, TStates>`
+ * and `WorkflowInstance<TActions, TContext, TStates>` hold
+ * `WorkflowDefinition<TContext, TStates>` so the engine returns a fully typed
+ * `DispatchResult` without any boundary cast at the instance level.
  *
  * @template TContext - Context type declared via `WorkflowBuilder.setContext()`.
- *                      Defaults to `unknown` for the type-erased engine/vis layer.
+ *                      Defaults to `unknown` for the type-erased vis layer.
+ * @template TStates  - Union of registered state IDs. Defaults to `string` for
+ *                      the type-erased engine/vis layer.
  */
-export interface WorkflowDefinition<TContext = unknown> {
+export interface WorkflowDefinition<TContext = unknown, TStates extends string = string> {
   readonly name: string;
 
   /** All states in the graph, keyed by state ID. */
-  readonly states: ReadonlyMap<string, AnyState>;
+  readonly states: ReadonlyMap<TStates, AnyState>;
 
   /** All declared transitions. */
-  readonly transitions: readonly TransitionDefinition[];
+  readonly transitions: readonly TransitionDefinition<TStates>[];
 
   /**
    * Zod schemas for each action's payload, keyed by action name.
@@ -36,13 +38,13 @@ export interface WorkflowDefinition<TContext = unknown> {
   readonly actionSchemas: ReadonlyMap<string, ZodSchema<unknown>>;
 
   /** ID of the single state that is `active` when an instance is first created. */
-  readonly initialStateId: string;
+  readonly initialStateId: TStates;
 
   /**
    * IDs of terminal states. Once any of these becomes `active`, the instance
    * is considered finished and further `dispatch` calls are rejected.
    */
-  readonly terminalStateIds: readonly string[];
+  readonly terminalStateIds: readonly TStates[];
 
   /**
    * Zod schema for the instance context declared via `WorkflowBuilder.setContext()`.
