@@ -1,7 +1,12 @@
 {
   "name": "flowyd",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A TypeScript library for defining, executing, and visualizing logic workflows",
+  "homepage": "https://zihung20.github.io/flowyd/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zihung20/flowyd.git"
+  },
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",

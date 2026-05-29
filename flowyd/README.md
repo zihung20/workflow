@@ -4,7 +4,7 @@ Strongly-typed SOP state machines for TypeScript.
 
 Build Standard Operating Procedures as typed workflow state machines. The compiler catches every typo in a state ID, every wrong action name, and every mismatched payload shape — before your code runs.
 
-**[Full documentation →](https://your-docs-site.com/guide/)**
+**[Full documentation →](https://zihung20.github.io/flowyd/guide/)**
 
 ---
 
@@ -133,12 +133,12 @@ const snapshot = inst.getSnapshot(); // plain JSON — save wherever you want
 
 | Section                                                         | What's there                                  |
 | --------------------------------------------------------------- | --------------------------------------------- |
-| [Introduction & type safety](https://your-docs-site.com/guide/) | What it is, compile-time guarantees in detail |
-| [Core Concepts](https://your-docs-site.com/guide/concepts)      | States, transitions, guards, snapshots        |
-| [Examples](https://your-docs-site.com/examples/)                | Four complete runnable workflows              |
-| [Scenarios](https://your-docs-site.com/scenarios/)              | Task-based guides ("I want to…")              |
-| [API Reference](https://your-docs-site.com/api/)                | Complete method reference                     |
-| [Developer Guide](https://your-docs-site.com/dev/)              | Architecture, contributing, design decisions  |
+| [Introduction & type safety](https://zihung20.github.io/flowyd/guide/) | What it is, compile-time guarantees in detail |
+| [Core Concepts](https://zihung20.github.io/flowyd/guide/concepts)      | States, transitions, guards, snapshots        |
+| [Examples](https://zihung20.github.io/flowyd/examples/)                | Four complete runnable workflows              |
+| [Scenarios](https://zihung20.github.io/flowyd/scenarios/)              | Task-based guides ("I want to…")              |
+| [API Reference](https://zihung20.github.io/flowyd/api/)                | Complete method reference                     |
+| [Developer Guide](https://zihung20.github.io/flowyd/dev/)              | Architecture, contributing, design decisions  |
 
 ---
 

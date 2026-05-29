@@ -17,7 +17,7 @@ pnpm add flowyd zod
 The compiler catches every typo in a state ID, every wrong action name, and every mismatched payload shape before your code runs.
 
 - [Library README](./flowyd/README.md) — install, quick start, API overview
-- [Full documentation](https://your-docs-site.com/guide/)
+- [Full documentation](https://zihung20.github.io/flowyd/guide/)
 
 ---
 

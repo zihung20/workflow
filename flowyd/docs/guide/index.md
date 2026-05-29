@@ -4,7 +4,7 @@
 
 It is designed for Standard Operating Procedures (SOPs) — real-world processes where the sequence matters, roles matter, and every step must be auditable.
 
-**[Full documentation →](https://your-docs-site.com)**
+**[Full documentation →](https://zihung20.github.io/flowyd/)**
 
 ## The selling point: compile-time safety on everything
 
