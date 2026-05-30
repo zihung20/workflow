@@ -25,17 +25,6 @@ const DepartSchema = z.object({
 
 export const predepartureWorkflow = createWorkflow({
   name: 'engineer-predeparture-checklist',
-  states: [
-    'reported-for-duty',
-    'briefed',
-    'inspection-fork',
-    'mechanical',
-    'electrical',
-    'safety-systems',
-    'inspections-joined',
-    'signed-off',
-    'departed',
-  ],
 })
   .defineAction('BRIEFING_RECEIVED', BriefingSchema)
   .defineAction('START_INSPECTION',  z.object({}))
@@ -47,10 +36,10 @@ export const predepartureWorkflow = createWorkflow({
 
   .addStep('reported-for-duty',  { label: 'Reported for Duty' })
   .addStep('briefed',            { label: 'Briefed' })
-  .addFork('inspection-fork',    { label: 'Inspection Fork', targets: ['mechanical', 'electrical', 'safety-systems'] })
   .addStep('mechanical',         { label: 'Mechanical Check' })
   .addStep('electrical',         { label: 'Electrical Check' })
   .addStep('safety-systems',     { label: 'Safety Systems Check' })
+  .addFork('inspection-fork',    { label: 'Inspection Fork', targets: ['mechanical', 'electrical', 'safety-systems'] })
   .addJoin('inspections-joined', { label: 'Inspections Complete', requires: ['mechanical', 'electrical', 'safety-systems'], mode: 'all' })
   .addStep('signed-off',         { label: 'Signed Off' })
   .addStep('departed',           { label: 'Departed' })

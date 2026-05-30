@@ -315,3 +315,20 @@ After every code change:
 - Added TSDoc to `StateRegistry.has()`; added `@returns` tag to `Workflow.getDefinition()`.
 
 233 tests; all pipeline steps clean.
+
+### [web-runner v2.0] 2026-05-30 — Full showcase website + Visual Designer
+**web-runner only — no changes to `flowyd/` library.**
+
+- **Landing page** (`pages/HomePage.tsx`): hero section with code snippet, 4 feature cards, example gallery cards, designer CTA.
+- **Examples page** (`pages/ExamplesPage.tsx`): React Router v6 routing; hash-based SPA with lazy-loaded pages.
+- **Visual Designer** (`pages/DesignerPage.tsx` + `designer/`):
+  - Interactive @xyflow/react canvas: drag nodes, draw transitions, delete with Backspace.
+  - Toolbar to add Step / Fork / Join / Wait nodes.
+  - Floating config panels for selected node (id, label, kind, initial/terminal, fork targets, join requires/mode, wait external name) and selected edge (action name, guard body).
+  - Canvas → Code sync: `codeGenerator.ts` emits canonical `createWorkflow()` TypeScript on every canvas change.
+  - Code → Canvas sync (debounced 500ms): Monaco TypeScript worker transpiles user code, `codeEvaluator.ts` executes via `new Function()` with injected flowyd/zod globals, reconciles canvas state.
+  - Bidirectional loop guard: `editSourceRef` prevents infinite canvas↔code update cycles.
+  - Run panel: click ▶ to evaluate current code and execute the workflow live using existing `SingleRunner`.
+- **Monaco Editor** (`designer/code/CodeEditor.tsx`): `@monaco-editor/react` + local workers via Vite `?worker`; hand-written ambient `flowyd` + `zod` type declarations registered via `addExtraLib` → full IntelliSense.
+- **Fixed workflow files**: removed stale `states: [...]` property from `createWorkflow()` in all four workflow files; fixed `predeparture.ts` fork-target ordering (branch states registered before the fork that references them).
+- **New deps**: `@monaco-editor/react@4.7.0`, `monaco-editor@0.52.2`, `react-router-dom@6.30.4`.

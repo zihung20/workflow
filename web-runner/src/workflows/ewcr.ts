@@ -70,15 +70,6 @@ const RestorePowerSchema = z.object({
 
 export const ewcrWorkflow = createWorkflow({
   name: 'ewcr-section',
-  states: [
-    'idle',
-    'isolation-requested',
-    'isolated',
-    'clearance-issued',
-    'work-in-progress',
-    'work-completed',
-    'power-restored',
-  ],
 })
   .defineAction('REQUEST_ISOLATION', RequestIsolationSchema)
   .defineAction('CONFIRM_ISOLATION', ConfirmIsolationSchema)

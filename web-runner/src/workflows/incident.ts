@@ -41,15 +41,6 @@ const CloseSchema = z.object({
 
 export const incidentWorkflow = createWorkflow({
   name: 'it-incident-response',
-  states: [
-    'detected',
-    'triaged',
-    'investigating',
-    'contained',
-    'eradicated',
-    'recovered',
-    'closed',
-  ],
 })
   .defineAction('DETECT',      DetectSchema)
   .defineAction('TRIAGE',      TriageSchema)

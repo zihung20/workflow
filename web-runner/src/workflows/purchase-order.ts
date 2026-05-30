@@ -30,14 +30,6 @@ const FulfillSchema = z.object({
 
 export const purchaseOrderWorkflow = createWorkflow({
   name: 'purchase-order',
-  states: [
-    'draft',
-    'submitted',
-    'under-review',
-    'approved',
-    'rejected',
-    'fulfilled',
-  ],
 })
   .defineAction('SUBMIT',   SubmitSchema)
   .defineAction('REVIEW',   ReviewSchema)
