@@ -1,3 +1,10 @@
+import { Label } from '../../components/ui/label';
+import { Input } from '../../components/ui/input';
+import { Button } from '../../components/ui/button';
+import { Checkbox } from '../../components/ui/checkbox';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '../../components/ui/select';
 import type { DesignerNode, DesignerWorkflow, NodeKind } from '../types';
 
 interface Props {
@@ -7,20 +14,17 @@ interface Props {
   onDelete: () => void;
 }
 
-const KIND_OPTIONS: { value: NodeKind; label: string }[] = [
-  { value: 'step', label: 'Step — waits for an action' },
-  { value: 'fork', label: 'Fork — activates parallel branches' },
-  { value: 'join', label: 'Join — synchronises branches' },
-  { value: 'wait', label: 'Wait — pauses for external signal' },
+const KIND_OPTIONS: { value: NodeKind; label: string; description: string }[] = [
+  { value: 'step', label: 'Step',   description: 'Waits for an action to be dispatched' },
+  { value: 'fork', label: 'Fork',   description: 'Activates parallel branches simultaneously' },
+  { value: 'join', label: 'Join',   description: 'Synchronises parallel branches' },
+  { value: 'wait', label: 'Wait',   description: 'Pauses until an external signal resolves it' },
 ];
 
-const INPUT = 'w-full rounded border border-slate-700 bg-slate-800 text-slate-100 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-slate-600';
-const CHECK = 'w-3.5 h-3.5 rounded border-slate-600 bg-slate-800 text-blue-500';
-
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-1">
-      <label className="block text-[10px] font-medium text-slate-500 uppercase tracking-wider">{label}</label>
+    <div className="space-y-1.5">
+      <Label>{label}</Label>
       {children}
     </div>
   );
@@ -36,81 +40,118 @@ export function NodePanel({ node, workflow, onChange, onDelete }: Props) {
   function toggleRequire(id: string) {
     set('joinRequires', node.joinRequires.includes(id)
       ? node.joinRequires.filter(r => r !== id)
-      : [...node.joinRequires, id]);
+      : [...node.joinRequires, id],
+    );
   }
 
   return (
-    <div className="p-3 space-y-3 text-xs">
-      <Row label="State ID">
-        <input className={INPUT} value={node.id} onChange={e => set('id', e.target.value)} placeholder="state-id" />
-      </Row>
+    <div className="p-3 space-y-3">
 
-      <Row label="Label">
-        <input className={INPUT} value={node.label} onChange={e => set('label', e.target.value)} placeholder="Display label" />
-      </Row>
+      <Field label="State ID">
+        <Input
+          value={node.id}
+          onChange={e => set('id', e.target.value)}
+          placeholder="state-id"
+        />
+      </Field>
 
-      <Row label="Kind">
-        <select className={INPUT} value={node.kind} onChange={e => set('kind', e.target.value as NodeKind)}>
-          {KIND_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-      </Row>
+      <Field label="Label">
+        <Input
+          value={node.label}
+          onChange={e => set('label', e.target.value)}
+          placeholder="Display label"
+        />
+      </Field>
 
-      <Row label="Flags">
+      <Field label="Kind">
+        <Select value={node.kind} onValueChange={v => set('kind', v as NodeKind)}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {KIND_OPTIONS.map(o => (
+              <SelectItem key={o.value} value={o.value}>
+                <span className="font-medium">{o.label}</span>
+                <span className="ml-1.5 text-muted-foreground">{o.description}</span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+
+      <Field label="Flags">
         <div className="flex gap-4 pt-0.5">
           {([['isInitial', '▶ Initial'], ['isTerminal', '■ Terminal']] as const).map(([key, lbl]) => (
-            <label key={key} className="flex items-center gap-1.5 cursor-pointer text-slate-400 hover:text-slate-200 transition-colors">
-              <input type="checkbox" className={CHECK} checked={node[key] as boolean} onChange={e => set(key, e.target.checked)} />
+            <label key={key} className="flex items-center gap-2 cursor-pointer select-none text-xs text-foreground">
+              <Checkbox
+                checked={node[key] as boolean}
+                onCheckedChange={v => set(key, !!v)}
+              />
               {lbl}
             </label>
           ))}
         </div>
-      </Row>
+      </Field>
 
       {node.kind === 'join' && (
         <>
-          <Row label="Requires (select states)">
-            <div className="space-y-1.5 pt-0.5 max-h-28 overflow-y-auto">
-              {others.length === 0 && <p className="text-slate-600 italic text-[11px]">Add other states first</p>}
-              {others.map(n => (
-                <label key={n.id} className="flex items-center gap-2 cursor-pointer text-slate-400 hover:text-slate-200 transition-colors">
-                  <input type="checkbox" className={CHECK} checked={node.joinRequires.includes(n.id)} onChange={() => toggleRequire(n.id)} />
-                  <span className="font-mono">{n.id}</span>
-                </label>
-              ))}
+          <Field label="Requires">
+            <div className="space-y-1.5 max-h-28 overflow-y-auto rounded-md border border-input bg-background p-2">
+              {others.length === 0
+                ? <p className="text-xs text-muted-foreground italic">Add other states first</p>
+                : others.map(n => (
+                  <label key={n.id} className="flex items-center gap-2 cursor-pointer select-none text-xs text-foreground">
+                    <Checkbox
+                      checked={node.joinRequires.includes(n.id)}
+                      onCheckedChange={() => toggleRequire(n.id)}
+                    />
+                    <span className="font-mono">{n.id}</span>
+                  </label>
+                ))
+              }
             </div>
-          </Row>
+          </Field>
 
-          <Row label="Mode">
-            <select className={INPUT}
+          <Field label="Synchronisation mode">
+            <Select
               value={typeof node.joinMode === 'number' ? 'quorum' : node.joinMode}
-              onChange={e => { const v = e.target.value; set('joinMode', v === 'quorum' ? 2 : (v as 'all' | 'any')); }}>
-              <option value="all">all — every required state must complete</option>
-              <option value="any">any — at least one must complete</option>
-              <option value="quorum">quorum — N states must complete</option>
-            </select>
-          </Row>
+              onValueChange={v => set('joinMode', v === 'quorum' ? 2 : (v as 'all' | 'any'))}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">all — every required state must complete</SelectItem>
+                <SelectItem value="any">any — at least one must complete</SelectItem>
+                <SelectItem value="quorum">quorum — N states must complete</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
 
           {typeof node.joinMode === 'number' && (
-            <Row label="Quorum count">
-              <input type="number" min={1} className={INPUT} value={node.joinMode}
-                onChange={e => set('joinMode', Math.max(1, parseInt(e.target.value) || 1))} />
-            </Row>
+            <Field label="Quorum count">
+              <Input
+                type="number"
+                min={1}
+                value={node.joinMode}
+                onChange={e => set('joinMode', Math.max(1, parseInt(e.target.value) || 1))}
+              />
+            </Field>
           )}
         </>
       )}
 
       {node.kind === 'wait' && (
-        <Row label="External name">
-          <input className={INPUT} value={node.waitExternalName} onChange={e => set('waitExternalName', e.target.value)} placeholder="external-service-name" />
-        </Row>
+        <Field label="External name">
+          <Input
+            value={node.waitExternalName}
+            onChange={e => set('waitExternalName', e.target.value)}
+            placeholder="external-service-name"
+          />
+        </Field>
       )}
 
-      <button
-        onClick={onDelete}
-        className="w-full text-[11px] text-red-500 border border-red-900/60 rounded py-1.5 hover:bg-red-900/20 transition-colors mt-1"
-      >
+      <Button variant="destructive" size="sm" className="w-full mt-1" onClick={onDelete}>
         Delete state
-      </button>
+      </Button>
     </div>
   );
 }

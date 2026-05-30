@@ -1,44 +1,31 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ReactFlowProvider } from '@xyflow/react';
 
 import { DesignerCanvas } from '../designer/canvas/DesignerCanvas';
-import { CodeEditor } from '../designer/code/CodeEditor';
-import type { CodeEditorHandle } from '../designer/code/CodeEditor';
 import { NodePanel } from '../designer/panels/NodePanel';
 import { EdgePanel } from '../designer/panels/EdgePanel';
 import { SingleRunner } from '../runners/SingleRunner';
+import { ShowCodeModal } from '../designer/code/ShowCodeModal';
 
 import { useDesignerWorkflow } from '../designer/hooks/useDesignerWorkflow';
-import { useCodeSync } from '../designer/hooks/useCodeSync';
 import { useRunState } from '../designer/hooks/useRunState';
 import { useTheme } from '../context/ThemeContext';
 
 import type { DesignerWorkflow, DesignerNode, DesignerEdge, Selection } from '../designer/types';
+import { Label } from '../components/ui/label';
+import { SchemaEditor } from '../designer/code/SchemaEditor';
 
 export default function DesignerPage() {
-  const { workflow, setWorkflow, initialCode, resetToDefault } = useDesignerWorkflow();
+  const { workflow, setWorkflow, resetToDefault } = useDesignerWorkflow();
   const [selection, setSelection] = useState<Selection>({ type: 'none' });
-  const [evalError, setEvalError]  = useState<string | null>(null);
+  const [showCode, setShowCode] = useState(false);
   const { runState, setRunState, handleRun } = useRunState();
   const { theme, toggleTheme } = useTheme();
 
-  const editorRef   = useRef<CodeEditorHandle>(null);
-  const workflowRef = useRef<DesignerWorkflow>(workflow);
-  workflowRef.current = workflow;
-
-  const { pushCode, handleCodeChange } = useCodeSync({
-    editorRef,
-    workflowRef,
-    setWorkflow,
-    onEvalError: setEvalError,
-  });
-
-  // Canvas structural changes regenerate code
   const handleWorkflowChange = useCallback((wf: DesignerWorkflow) => {
     setWorkflow(wf);
-    pushCode(wf);
-  }, [setWorkflow, pushCode]);
+  }, [setWorkflow]);
 
   // ── Selection-driven panel edits ─────────────────────────────────────────
 
@@ -84,7 +71,18 @@ export default function DesignerPage() {
     setSelection({ type: 'none' });
   }
 
-  const hasPanel = selectedNode !== null || selectedEdge !== null;
+  function handleSchemaChange(actionName: string, body: string) {
+    handleWorkflowChange({
+      ...workflow,
+      actionSchemas: { ...workflow.actionSchemas, [actionName]: body },
+    });
+  }
+
+  function handleContextSchemaChange(body: string) {
+    handleWorkflowChange({ ...workflow, contextSchemaBody: body });
+  }
+
+  const hasPanel = selectedNode !== null || selectedEdge !== null || selection.type === 'settings';
   const isRunning = runState.mode === 'running';
 
   return (
@@ -103,14 +101,7 @@ export default function DesignerPage() {
           placeholder="workflow-name"
         />
 
-        {/* Eval error banner */}
-        <div className="flex-1 flex items-center justify-center">
-          {evalError && (
-            <span className="text-xs text-red-500 dark:text-red-400 max-w-sm truncate flex items-center gap-1.5">
-              <span>⚠</span> {evalError}
-            </span>
-          )}
-        </div>
+        <div className="flex-1" />
 
         <div className="flex items-center gap-2">
           <button
@@ -121,7 +112,10 @@ export default function DesignerPage() {
             {theme === 'dark' ? '☀' : '☾'}
           </button>
           <button
-            onClick={resetToDefault}
+            onClick={() => {
+              resetToDefault();
+              setSelection({ type: 'none' });
+            }}
             title="Reset canvas to default (clears localStorage)"
             className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
           >
@@ -133,6 +127,24 @@ export default function DesignerPage() {
           >
             Examples
           </Link>
+          {/* Context / settings panel toggle */}
+          <button
+            onClick={() => setSelection(s => s.type === 'settings' ? { type: 'none' } : { type: 'settings' })}
+            title="Workflow context & settings"
+            className={`text-xs border rounded px-2.5 py-1 transition-colors ${
+              selection.type === 'settings'
+                ? 'bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 border-slate-300 dark:border-slate-600'
+                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 border-slate-200 dark:border-slate-700'
+            }`}
+          >
+            Context
+          </button>
+          <button
+            onClick={() => setShowCode(true)}
+            className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 border border-slate-200 dark:border-slate-700 rounded px-2.5 py-1 transition-colors"
+          >
+            {'</>'}  Show Code
+          </button>
           {isRunning && (
             <button
               onClick={() => setRunState({ mode: 'idle' })}
@@ -142,7 +154,7 @@ export default function DesignerPage() {
             </button>
           )}
           <button
-            onClick={() => { void handleRun(() => editorRef.current?.getValue() ?? ''); }}
+            onClick={() => { void handleRun(workflow); }}
             className="text-xs bg-blue-600 hover:bg-blue-500 text-white rounded px-3 py-1.5 font-medium transition-colors flex items-center gap-1.5"
           >
             <span>▶</span> Run
@@ -150,63 +162,65 @@ export default function DesignerPage() {
         </div>
       </header>
 
-      {/* ── Main layout ──────────────────────────────────────────────────── */}
-      <div className="flex-1 min-h-0 flex">
+      {/* ── Main canvas area ──────────────────────────────────────────────── */}
+      <div className="flex-1 min-h-0 relative">
+        <ReactFlowProvider>
+          <DesignerCanvas
+            workflow={workflow}
+            selection={selection}
+            onWorkflowChange={handleWorkflowChange}
+            onSelectionChange={setSelection}
+          />
+        </ReactFlowProvider>
 
-        {/* Canvas panel */}
-        <div className="relative flex-1 min-w-0">
-          <ReactFlowProvider>
-            <DesignerCanvas
-              workflow={workflow}
-              selection={selection}
-              onWorkflowChange={handleWorkflowChange}
-              onSelectionChange={setSelection}
-            />
-          </ReactFlowProvider>
-        </div>
+        {/* Floating config panel — overlays canvas on the right */}
+        {hasPanel && (
+          <div className="absolute top-0 right-0 h-full w-72 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700/60 shadow-xl overflow-y-auto z-10">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 dark:border-slate-800 sticky top-0 bg-white dark:bg-slate-900">
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                {selection.type === 'settings' ? 'Workflow' : selectedNode ? 'State' : 'Transition'}
+              </span>
+              <button
+                onClick={() => setSelection({ type: 'none' })}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-sm transition-colors"
+                title="Close panel"
+              >
+                ✕
+              </button>
+            </div>
 
-        {/* Right column: config panel + code editor */}
-        <div className="w-[44%] shrink-0 flex flex-col border-l border-slate-200 dark:border-slate-700/60">
-
-          {/* Config panel — visible when a node or edge is selected */}
-          {hasPanel && (
-            <div className="shrink-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700/60 overflow-y-auto max-h-72">
-              <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  {selectedNode ? 'State' : 'Transition'}
-                </span>
-                <button
-                  onClick={() => setSelection({ type: 'none' })}
-                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-sm transition-colors"
-                  title="Close panel"
-                >
-                  ✕
-                </button>
+            {/* Workflow settings panel */}
+            {selection.type === 'settings' && (
+              <div className="p-3 space-y-3">
+                <div className="space-y-1.5">
+                  <Label>Context schema</Label>
+                  <p className="text-[10px] text-muted-foreground">
+                    Zod object fields for <code className="font-mono">ctx.context</code>.
+                    Generates <code className="font-mono">.setContext(z.object({'{'}...{'}'}))</code>.
+                  </p>
+                  <SchemaEditor
+                    id="context"
+                    value={workflow.contextSchemaBody}
+                    onChange={handleContextSchemaChange}
+                  />
+                </div>
               </div>
-              {selectedNode && (
-                <NodePanel node={selectedNode} workflow={workflow} onChange={handleNodeChange} onDelete={handleDeleteNode} />
-              )}
-              {selectedEdge && (
-                <EdgePanel edge={selectedEdge} onChange={handleEdgeChange} onDelete={handleDeleteEdge} />
-              )}
-            </div>
-          )}
+            )}
 
-          {/* Code editor — always vs-dark regardless of app theme */}
-          <div className="flex flex-col flex-1 min-h-0">
-            <div className="shrink-0 flex items-center px-3 h-8 bg-[#252526] border-b border-[#3c3c3c]">
-              <span className="text-[11px] text-slate-400 font-mono">workflow.ts</span>
-              <span className="ml-auto text-[10px] text-slate-600">TypeScript · flowyd</span>
-            </div>
-            <div className="flex-1 min-h-0 bg-[#1e1e1e]">
-              <CodeEditor
-                ref={editorRef}
-                defaultValue={initialCode}
-                onChange={handleCodeChange}
+            {selectedNode && (
+              <NodePanel node={selectedNode} workflow={workflow} onChange={handleNodeChange} onDelete={handleDeleteNode} />
+            )}
+            {selectedEdge && (
+              <EdgePanel
+                edge={selectedEdge}
+                workflow={workflow}
+                onChange={handleEdgeChange}
+                onSchemaChange={handleSchemaChange}
+                onDelete={handleDeleteEdge}
               />
-            </div>
+            )}
           </div>
-        </div>
+        )}
       </div>
 
       {/* ── Run panel ────────────────────────────────────────────────────── */}
@@ -231,6 +245,11 @@ export default function DesignerPage() {
             ✕
           </button>
         </div>
+      )}
+
+      {/* ── Show Code modal ──────────────────────────────────────────────── */}
+      {showCode && (
+        <ShowCodeModal workflow={workflow} onClose={() => setShowCode(false)} />
       )}
     </div>
   );

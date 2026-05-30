@@ -1,10 +1,10 @@
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { lazy, Suspense } from 'react';
-import { ThemeProvider } from './context/ThemeContext';
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Suspense } from "react";
+import { ThemeProvider } from "./context/ThemeContext";
 
-const HomePage     = lazy(() => import('./pages/HomePage'));
-const ExamplesPage = lazy(() => import('./pages/ExamplesPage'));
-const DesignerPage = lazy(() => import('./pages/DesignerPage'));
+import HomePage from "./pages/HomePage";
+import ExamplesPage from "./pages/ExamplesPage";
+import DesignerPage from "./pages/DesignerPage";
 
 function Spinner() {
   return (
@@ -21,7 +21,10 @@ export default function App() {
         <Suspense fallback={<Spinner />}>
           <Routes>
             <Route path="/" element={<HomePage />} />
-            <Route path="/examples" element={<Navigate to="/examples/purchase-order" replace />} />
+            <Route
+              path="/examples"
+              element={<Navigate to="/examples/purchase-order" replace />}
+            />
             <Route path="/examples/:id" element={<ExamplesPage />} />
             <Route path="/designer" element={<DesignerPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />

@@ -38,7 +38,7 @@ function indent(line: string): string {
 }
 
 export function generateCode(wf: DesignerWorkflow): string {
-  const { name, nodes, edges } = wf;
+  const { name, nodes, edges, actionSchemas, contextSchemaBody } = wf;
   const sortedNodes = topoSort(nodes, edges);
 
   const transitionEdges = edges.filter(e => e.kind === 'transition');
@@ -63,13 +63,24 @@ export function generateCode(wf: DesignerWorkflow): string {
     ``,
   ];
 
-  for (const action of actionNames) {
-    lines.push(`const ${action}Schema = z.object({});`);
+  // Context schema constant (emitted before action schemas)
+  const ctxExpr = contextSchemaBody.trim();
+  if (ctxExpr) {
+    lines.push(`const ContextSchema = ${ctxExpr};`);
   }
 
-  if (actionNames.length > 0) lines.push(``);
+  for (const action of actionNames) {
+    const expr = actionSchemas[action]?.trim() || 'z.object({})';
+    lines.push(`const ${action}Schema = ${expr};`);
+  }
+
+  if (actionNames.length > 0 || ctxExpr) lines.push(``);
 
   lines.push(`const workflow = createWorkflow({ name: ${JSON.stringify(name)} })`);
+
+  if (ctxExpr) {
+    lines.push(indent(`.setContext(ContextSchema)`));
+  }
 
   for (const action of actionNames) {
     lines.push(indent(`.defineAction('${action}', ${action}Schema)`));
@@ -99,9 +110,7 @@ export function generateCode(wf: DesignerWorkflow): string {
     lines.push(indent(`.setInitial('${initialNode.id}')`));
   }
 
-  if (terminalNodes.length === 1) {
-    lines.push(indent(`.setTerminal('${terminalNodes[0]!.id}')`));
-  } else if (terminalNodes.length > 1) {
+  if (terminalNodes.length > 0) {
     const ids = terminalNodes.map(t => `'${t.id}'`).join(', ');
     lines.push(indent(`.setTerminal([${ids}])`));
   }
@@ -139,4 +148,6 @@ export const DEFAULT_WORKFLOW: DesignerWorkflow = {
   edges: [
     { id: 'e-start-end', fromNodeId: 'start', toNodeId: 'end', kind: 'transition', actionName: 'COMPLETE', guardBody: '' },
   ],
+  actionSchemas: {},
+  contextSchemaBody: '',
 };

@@ -1,131 +1,8 @@
 import type { Monaco } from '@monaco-editor/react';
+import flowydDts from 'virtual:flowyd-dts';
 
-const FLOWYD_TYPES = `
-declare module 'flowyd' {
-  import type { ZodSchema } from 'zod';
-
-  export enum StateKind { Step = 'step', Fork = 'fork', Join = 'join', Wait = 'wait' }
-  export enum StateStatus { Idle = 'idle', Active = 'active', Waiting = 'waiting', Completed = 'completed' }
-
-  export type JoinMode = 'all' | 'any' | number;
-
-  export interface ReadonlyInstanceState<TStates extends string = string> {
-    isStateCompleted(id: TStates): boolean;
-    isStateActive(id: TStates): boolean;
-  }
-
-  export interface GuardContext<TPayload, TContext = unknown, TStates extends string = string> {
-    readonly payload: TPayload;
-    readonly context: TContext;
-    readonly instanceState: ReadonlyInstanceState<TStates>;
-  }
-
-  export type GuardFn<TPayload, TContext = unknown> =
-    (ctx: GuardContext<TPayload, TContext>) => boolean | Promise<boolean>;
-
-  export interface IGuard<TPayload = unknown> {
-    evaluate(ctx: GuardContext<TPayload>): Promise<boolean>;
-  }
-
-  export declare namespace Guard {
-    function fn<TPayload>(fn: GuardFn<TPayload>): IGuard<TPayload>;
-    function inject(name: string): IGuard;
-    function always(): IGuard;
-    function never(): IGuard;
-    function and(...guards: IGuard[]): IGuard;
-    function or(...guards: IGuard[]): IGuard;
-    function not(guard: IGuard): IGuard;
-    function stateCompleted(id: string): IGuard;
-    function stateActive(id: string): IGuard;
-  }
-
-  export interface AnyState {
-    readonly id: string;
-    readonly kind: StateKind;
-    readonly label: string;
-  }
-
-  export interface TransitionDefinition {
-    readonly from: string;
-    readonly to: string;
-    readonly on: string;
-    readonly guard?: IGuard;
-  }
-
-  export interface WorkflowDefinition<TContext = unknown, TStates extends string = string> {
-    readonly name: string;
-    readonly states: ReadonlyMap<TStates, AnyState>;
-    readonly transitions: readonly TransitionDefinition[];
-    readonly actionSchemas: ReadonlyMap<string, ZodSchema<unknown>>;
-    readonly initialStateId: TStates;
-    readonly terminalStateIds: readonly TStates[];
-    readonly contextSchema?: ZodSchema<TContext>;
-  }
-
-  export type DispatchResult =
-    | { success: true; action: string }
-    | { success: false; reason: string; action: string };
-
-  export interface InstanceSnapshot<TContext = unknown, TStates extends string = string> {
-    readonly instanceId: string;
-    readonly workflowName: string;
-    readonly version: number;
-    readonly stateStatuses: Record<string, string>;
-    readonly isTerminal: boolean;
-    readonly history: unknown[];
-    readonly createdAt: string;
-    readonly updatedAt: string;
-  }
-
-  export declare class WorkflowInstance<
-    TActions = Record<string, unknown>,
-    TContext = unknown,
-    TStates extends string = string,
-  > {
-    dispatch(action: keyof TActions & string, payload: unknown): Promise<DispatchResult>;
-    getSnapshot(): InstanceSnapshot<TContext, TStates>;
-    injectGuard(name: string, fn: GuardFn<unknown>): this;
-    setContext(ctx: TContext): this;
-    getContext(): TContext;
-  }
-
-  export declare class Workflow<
-    TActions = Record<never, never>,
-    TStates extends string = string,
-    TContext = unknown,
-  > {
-    createInstance(id: string, ...ctx: unknown[]): WorkflowInstance<TActions, TContext, TStates>;
-    restoreInstance(snapshot: InstanceSnapshot): WorkflowInstance<TActions, TContext, TStates>;
-    getDefinition(): WorkflowDefinition<TContext, TStates>;
-  }
-
-  export declare class WorkflowBuilder<
-    TActions = Record<never, never>,
-    TStates extends string = never,
-    TContext = unknown,
-  > {
-    defineAction<K extends string, T>(name: K, schema: ZodSchema<T>): WorkflowBuilder<TActions & Record<K, T>, TStates, TContext>;
-    addStep<K extends string>(id: K, options?: { label?: string }): WorkflowBuilder<TActions, TStates | K, TContext>;
-    addFork<K extends string>(id: K, options: { label?: string; targets: (TStates extends never ? string : TStates)[] }): WorkflowBuilder<TActions, TStates | K, TContext>;
-    addJoin<K extends string>(id: K, options: { label?: string; requires: (TStates extends never ? string : TStates)[]; mode?: JoinMode }): WorkflowBuilder<TActions, TStates | K, TContext>;
-    addWait<K extends string>(id: K, options?: { label?: string; externalName?: string }): WorkflowBuilder<TActions, TStates | K, TContext>;
-    setContext<C>(schema: ZodSchema<C>): WorkflowBuilder<TActions, TStates, C>;
-    setInitial(id: TStates extends never ? string : TStates): this;
-    setTerminal(ids: (TStates extends never ? string : TStates) | (TStates extends never ? string : TStates)[]): this;
-    addTransition(config: {
-      from: TStates extends never ? string : TStates;
-      to: TStates extends never ? string : TStates;
-      on: keyof TActions extends never ? string : keyof TActions & string;
-      guard?: GuardFn<unknown> | IGuard;
-    }): this;
-    build(): Workflow<TActions, TStates, TContext>;
-  }
-
-  export declare function createWorkflow(config: { name: string }): WorkflowBuilder;
-  export declare function createDynamicWorkflow(config: { name: string }): WorkflowBuilder<Record<string, unknown>, string>;
-}
-`;
-
+// Hand-written because zod's real .d.ts files have deep internal cross-imports
+// that don't flatten well for Monaco's virtual file system.
 const ZOD_TYPES = `
 declare module 'zod' {
   export type ZodRawShape = Record<string, ZodTypeAny>;
@@ -258,8 +135,95 @@ declare module 'zod' {
   export function nullable<T extends ZodTypeAny>(type: T): ZodNullable<T>;
   export function promise<T extends ZodTypeAny>(type: T): ZodPromise<T>;
   export function discriminatedUnion<T extends string, U extends readonly [ZodObject<Record<T, ZodTypeAny>>, ...ZodObject<Record<T, ZodTypeAny>>[]]>(discriminator: T, options: U): ZodUnion<U>;
+
+  /** The \`z\` named export — an object containing all schema factory functions. */
+  export namespace z {
+    export type ZodRawShape = Record<string, ZodTypeAny>;
+    export type ZodTypeAny = ZodType<unknown>;
+    export type infer<T extends ZodType> = T['_type'];
+    export type ZodSchema<T = unknown> = ZodType<T>;
+    export function string(): ZodString;
+    export function number(): ZodNumber;
+    export function boolean(): ZodBoolean;
+    export function date(): ZodDate;
+    export function unknown(): ZodUnknown;
+    export function any(): ZodAny;
+    export function literal<T extends string | number | boolean | null>(value: T): ZodLiteral<T>;
+    export function object<T extends ZodRawShape>(shape: T): ZodObject<T>;
+    export function array<T extends ZodTypeAny>(schema: T): ZodArray<T>;
+    export function union<T extends readonly [ZodTypeAny, ...ZodTypeAny[]]>(types: T): ZodUnion<T>;
+    export function tuple<T extends [ZodTypeAny, ...ZodTypeAny[]]>(items: T): ZodTuple<T>;
+    export function record<V extends ZodTypeAny>(valueType: V): ZodRecord<V>;
+    export function optional<T extends ZodTypeAny>(type: T): ZodOptional<T>;
+    export function nullable<T extends ZodTypeAny>(type: T): ZodNullable<T>;
+    export function promise<T extends ZodTypeAny>(type: T): ZodPromise<T>;
+    export function nativeEnum<T extends Record<string, string | number>>(e: T): ZodNativeEnum<T>;
+    export function intersection<A extends ZodTypeAny, B extends ZodTypeAny>(a: A, b: B): ZodIntersection<A, B>;
+    export function discriminatedUnion<T extends string>(discriminator: T, options: readonly ZodObject<Record<T, ZodTypeAny>>[]): ZodUnion<readonly [ZodTypeAny, ...ZodTypeAny[]]>;
+    export function enum_<T extends [string, ...string[]]>(values: T): ZodEnum<T>;
+    export { enum_ as enum };
+  }
 }
 `;
+
+/**
+ * Converts a full `z.object({ ... })` expression (or bare field body) to an
+ * approximate TypeScript type. Used to feed typed `ctx.payload` / `ctx.context`
+ * into the guard editor.
+ */
+function zodExprToTsType(expr: string): string {
+  const trimmed = expr.trim();
+  if (!trimmed || trimmed === 'z.object({})') return 'Record<string, unknown>';
+  try {
+    // Accept both full `z.object({ fields })` and bare `fields` strings.
+    const innerMatch = /z\.object\(\s*\{([^}]*)\}\s*\)/.exec(trimmed);
+    const body = innerMatch ? (innerMatch[1] ?? trimmed) : trimmed;
+
+    const fields: string[] = [];
+    const re = /(\w+)\s*:\s*(z\.\w+\([^)]*\)(?:\.\w+\([^)]*\))*)/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(body)) !== null) {
+      const key = m[1];
+      const zodToken = m[2];
+      if (!key || !zodToken) continue;
+      let tsType = 'unknown';
+      if (/^z\.string\(/.test(zodToken))       tsType = 'string';
+      else if (/^z\.number\(/.test(zodToken))  tsType = 'number';
+      else if (/^z\.boolean\(/.test(zodToken)) tsType = 'boolean';
+      else if (/^z\.date\(/.test(zodToken))    tsType = 'Date';
+      fields.push(`${key}: ${tsType}`);
+    }
+    return fields.length > 0 ? `{ ${fields.join('; ')} }` : 'Record<string, unknown>';
+  } catch {
+    return 'Record<string, unknown>';
+  }
+}
+
+/**
+ * Re-registers the `ctx` global for guard body editors.
+ * Calling this with the same URI replaces the previous declaration in-place.
+ * @param payloadZodBody - Zod object body for the action's payload schema.
+ * @param contextZodBody - Zod object body for the workflow context schema.
+ */
+export function updateGuardContextTypes(
+  monacoInstance: Monaco,
+  nodeIds: string[],
+  payloadZodBody = '',
+  contextZodBody = '',
+): void {
+  const stateIdUnion = nodeIds.length > 0
+    ? nodeIds.map(id => JSON.stringify(id)).join(' | ')
+    : 'string';
+  const payloadType  = zodExprToTsType(payloadZodBody);
+  const contextType  = contextZodBody.trim() ? zodExprToTsType(contextZodBody) : 'unknown';
+
+  // No top-level `import` — keeping this file ambient so `ctx` is a true global.
+  // Inline `import()` type syntax resolves GuardContext from the already-loaded flowyd .d.ts.
+  monacoInstance.languages.typescript.typescriptDefaults.addExtraLib(
+    `declare const ctx: import('flowyd').GuardContext<${payloadType}, ${contextType}, ${stateIdUnion}>;`,
+    'file:///guard-context.d.ts',
+  );
+}
 
 export function setupMonacoTypes(monacoInstance: Monaco): void {
   const ts = monacoInstance.languages.typescript;
@@ -271,9 +235,7 @@ export function setupMonacoTypes(monacoInstance: Monaco): void {
     strict: true,
     esModuleInterop: true,
     allowSyntheticDefaultImports: true,
-    // Include standard browser + ES2020 globals so console, setTimeout, Promise, etc. have types.
-    // Without this Monaco defaults to ES5 only.
-    lib: ['es2020', 'dom'],
+    lib: ['es5', 'es2015', 'es2016', 'es2017', 'es2018', 'es2019', 'es2020', 'dom', 'dom.iterable'],
   });
 
   ts.typescriptDefaults.setDiagnosticsOptions({
@@ -281,8 +243,24 @@ export function setupMonacoTypes(monacoInstance: Monaco): void {
     noSyntaxValidation: false,
   });
 
-  // Registered at file:/// paths so the TypeScript service can resolve them
-  // when the editor model is also at a file:/// URI (see CodeEditor path prop).
-  ts.typescriptDefaults.addExtraLib(FLOWYD_TYPES, 'file:///node_modules/flowyd/index.d.ts');
-  ts.typescriptDefaults.addExtraLib(ZOD_TYPES,    'file:///node_modules/zod/index.d.ts');
+  // Register all flowyd .d.ts files from the real build output.
+  // index.d.ts imports chunk files as './workflow-<hash>.js'. Register each chunk
+  // at both its .d.ts path AND its .js path so Monaco's TypeScript worker can
+  // resolve the import regardless of whether it applies .js→.d.ts substitution.
+  for (const { filename, content } of flowydDts) {
+    ts.typescriptDefaults.addExtraLib(content, `file:///node_modules/flowyd/${filename}`);
+    if (filename !== 'index.d.ts' && filename !== 'index.d.cts') {
+      const jsFilename = filename.replace(/\.d\.ts$/, '.js');
+      ts.typescriptDefaults.addExtraLib(content, `file:///node_modules/flowyd/${jsFilename}`);
+    }
+  }
+
+  ts.typescriptDefaults.addExtraLib(ZOD_TYPES, 'file:///node_modules/zod/index.d.ts');
+
+  // Expose `z` as a global so schema editors can write `z.object({...})` without an import.
+  // Inline import() keeps the file ambient (no top-level import statement → not a module).
+  ts.typescriptDefaults.addExtraLib(
+    `declare const z: import('zod').z;`,
+    'file:///zod-global.d.ts',
+  );
 }

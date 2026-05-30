@@ -70,6 +70,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, Props>(({ defaultValue, o
         wordWrap: 'on',
         tabSize: 2,
         padding: { top: 16, bottom: 16 },
+        readOnly: true,
         suggestOnTriggerCharacters: true,
         quickSuggestions: { other: true, comments: false, strings: false },
         parameterHints: { enabled: true },

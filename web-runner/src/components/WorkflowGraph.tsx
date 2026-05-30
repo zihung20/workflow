@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { ReactFlow, Controls, MiniMap, Background, BackgroundVariant } from '@xyflow/react';
+import { ReactFlow, Controls, Background, BackgroundVariant } from '@xyflow/react';
 import type { Node, Edge } from '@xyflow/react';
 import { JsonGraphExporter } from 'flowyd/visualization';
 import type { JsonGraph, JsonGraphNode, JsonGraphEdge } from 'flowyd/visualization';
@@ -106,7 +106,6 @@ export function WorkflowGraph() {
     >
       <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
       <Controls showInteractive={false} />
-      <MiniMap nodeStrokeWidth={3} zoomable pannable />
     </ReactFlow>
   );
 }

@@ -1,6 +1,8 @@
 import { useCallback, useState } from 'react';
 import { evaluateWorkflowCode } from '../code/codeEvaluator';
+import { generateCode } from '../code/codeGenerator';
 import type { WorkflowDefinition, DispatchResult, InstanceSnapshot } from 'flowyd';
+import type { DesignerWorkflow } from '../types';
 
 type AnyInstance = {
   dispatch(action: string, payload: unknown): Promise<DispatchResult>;
@@ -21,18 +23,14 @@ export type RunState =
 export interface RunStateHandles {
   runState: RunState;
   setRunState: React.Dispatch<React.SetStateAction<RunState>>;
-  handleRun(getCode: () => string): Promise<void>;
+  handleRun(workflow: DesignerWorkflow): Promise<void>;
 }
 
 export function useRunState(): RunStateHandles {
   const [runState, setRunState] = useState<RunState>({ mode: 'idle' });
 
-  const handleRun = useCallback(async (getCode: () => string) => {
-    const code = getCode();
-    if (!code) {
-      setRunState({ mode: 'error', message: 'Editor not ready — wait a moment and try again.' });
-      return;
-    }
+  const handleRun = useCallback(async (workflow: DesignerWorkflow) => {
+    const code = generateCode(workflow);
     const result = await evaluateWorkflowCode(code);
     if (!result.ok) {
       setRunState({ mode: 'error', message: result.error });

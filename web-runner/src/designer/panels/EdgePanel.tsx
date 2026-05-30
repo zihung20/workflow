@@ -1,79 +1,101 @@
-import type { DesignerEdge, EdgeKind } from '../types';
+import { Label } from '../../components/ui/label';
+import { Input } from '../../components/ui/input';
+import { Button } from '../../components/ui/button';
+import { SchemaEditor } from '../code/SchemaEditor';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '../../components/ui/select';
+import { GuardEditor } from '../code/GuardEditor';
+import type { DesignerEdge, DesignerWorkflow, EdgeKind } from '../types';
 
 interface Props {
   edge: DesignerEdge;
+  workflow: DesignerWorkflow;
   onChange: (updated: DesignerEdge) => void;
+  onSchemaChange: (actionName: string, body: string) => void;
   onDelete: () => void;
 }
 
-const INPUT    = 'w-full rounded border border-slate-700 bg-slate-800 text-slate-100 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-slate-600';
-const TEXTAREA = `${INPUT} font-mono resize-none leading-relaxed`;
-
-function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-1">
-      <label className="block text-[10px] font-medium text-slate-500 uppercase tracking-wider">{label}</label>
-      {hint && <p className="text-[10px] text-slate-600">{hint}</p>}
+    <div className="space-y-1.5">
+      <Label>{label}</Label>
+      {hint && <p className="text-[10px] text-muted-foreground">{hint}</p>}
       {children}
     </div>
   );
 }
 
-export function EdgePanel({ edge, onChange, onDelete }: Props) {
+export function EdgePanel({ edge, workflow, onChange, onSchemaChange, onDelete }: Props) {
   function set<K extends keyof DesignerEdge>(k: K, v: DesignerEdge[K]) {
     onChange({ ...edge, [k]: v });
   }
 
   const isFork = edge.kind === 'fork-target';
+  const nodeIds = workflow.nodes.map(n => n.id);
+  const payloadZodBody = workflow.actionSchemas[edge.actionName] ?? '';
+  const contextZodBody = workflow.contextSchemaBody;
 
   return (
-    <div className="p-3 space-y-3 text-xs">
-      <div className="flex items-center gap-2 text-slate-500 font-mono text-[11px] bg-slate-800/60 rounded px-2 py-1.5">
-        <span className="text-slate-400">{edge.fromNodeId}</span>
-        <span>→</span>
-        <span className="text-slate-400">{edge.toNodeId}</span>
+    <div className="p-3 space-y-3">
+
+      {/* Route header */}
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono bg-muted/40 rounded-md px-2.5 py-1.5 border border-border">
+        <span className="text-foreground font-medium">{edge.fromNodeId}</span>
+        <span className="opacity-50">→</span>
+        <span className="text-foreground font-medium">{edge.toNodeId}</span>
       </div>
 
-      <Row label="Edge type">
-        <select className={INPUT} value={edge.kind} onChange={e => set('kind', e.target.value as EdgeKind)}>
-          <option value="transition">transition — triggered by dispatching an action</option>
-          <option value="fork-target">fork-target — activated automatically by a Fork state</option>
-        </select>
-      </Row>
+      <Field label="Edge type">
+        <Select value={edge.kind} onValueChange={v => set('kind', v as EdgeKind)}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="transition">transition — triggered by dispatching an action</SelectItem>
+            <SelectItem value="fork-target">fork-target — activated automatically by a Fork state</SelectItem>
+          </SelectContent>
+        </Select>
+      </Field>
 
       {!isFork && (
         <>
-          <Row label="Action name" hint="Convention: ALL_CAPS. Must match a defineAction() call.">
-            <input
-              className={INPUT}
+          <Field label="Action name" hint="Convention: ALL_CAPS — must match a defineAction() call.">
+            <Input
               value={edge.actionName}
               onChange={e => set('actionName', e.target.value.toUpperCase().replace(/\s+/g, '_'))}
               placeholder="SUBMIT"
             />
-          </Row>
+          </Field>
 
-          <Row
-            label="Guard (optional)"
-            hint="Return true to allow. ctx.payload is typed to this action's schema."
+          <Field
+            label="Payload schema"
+            hint="Shared by all transitions using this action name."
           >
-            <textarea
-              rows={4}
-              className={TEXTAREA}
-              value={edge.guardBody}
-              onChange={e => set('guardBody', e.target.value)}
-              placeholder={`// e.g.\nreturn ctx.payload.amount > 1000;`}
-              spellCheck={false}
+            <SchemaEditor
+              id={`action-${edge.actionName}`}
+              value={payloadZodBody}
+              onChange={body => onSchemaChange(edge.actionName, body)}
             />
-          </Row>
+          </Field>
+
+          <Field
+            label="Guard (optional)"
+            hint="ctx.payload, ctx.context, ctx.instanceState.isStateCompleted() are all typed."
+          >
+            <GuardEditor
+              edgeId={edge.id}
+              nodeIds={nodeIds}
+              payloadZodBody={payloadZodBody}
+              contextZodBody={contextZodBody}
+              value={edge.guardBody}
+              onChange={body => set('guardBody', body)}
+            />
+          </Field>
         </>
       )}
 
-      <button
-        onClick={onDelete}
-        className="w-full text-[11px] text-red-500 border border-red-900/60 rounded py-1.5 hover:bg-red-900/20 transition-colors"
-      >
+      <Button variant="destructive" size="sm" className="w-full" onClick={onDelete}>
         Delete transition
-      </button>
+      </Button>
     </div>
   );
 }
