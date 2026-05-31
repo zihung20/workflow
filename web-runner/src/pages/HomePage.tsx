@@ -1,23 +1,8 @@
 import { Link } from 'react-router-dom';
-
-const CODE_SNIPPET = `import { createWorkflow } from 'flowyd';
-import { z } from 'zod';
-
-const workflow = createWorkflow({ name: 'purchase-approval' })
-  .defineAction('SUBMIT',  z.object({ amount: z.number(), vendor: z.string() }))
-  .defineAction('APPROVE', z.object({ approvedBy: z.string() }))
-  .defineAction('REJECT',  z.object({ reason: z.string() }))
-  .addStep('draft')
-  .addStep('review')
-  .addStep('approved')
-  .addStep('rejected')
-  .setInitial('draft')
-  .setTerminal(['approved', 'rejected'])
-  .addTransition({ from: 'draft',   to: 'review',   on: 'SUBMIT' })
-  .addTransition({ from: 'review',  to: 'approved', on: 'APPROVE',
-    guard: (ctx) => ctx.payload.approvedBy.trim() !== '' })
-  .addTransition({ from: 'review',  to: 'rejected', on: 'REJECT' })
-  .build();`;
+import Editor from '@monaco-editor/react';
+import type { Monaco } from '@monaco-editor/react';
+import { setupMonacoTypes } from '../designer/code/monacoSetup';
+import purchaseOrderSource from '../workflows/purchase-order.ts?raw';
 
 const FEATURES = [
   {
@@ -125,16 +110,41 @@ export default function HomePage() {
           </div>
 
           {/* Code snippet */}
-          <div className="mt-12 rounded-xl bg-slate-800 border border-slate-700 overflow-hidden">
-            <div className="flex items-center px-4 h-9 bg-slate-800 border-b border-slate-700 gap-2">
+          <div className="mt-12 rounded-xl border border-slate-700 overflow-hidden">
+            <div className="flex items-center px-4 h-9 bg-[#1e1e1e] border-b border-slate-700 gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-red-500 opacity-70" />
               <span className="w-2.5 h-2.5 rounded-full bg-yellow-500 opacity-70" />
               <span className="w-2.5 h-2.5 rounded-full bg-green-500 opacity-70" />
-              <span className="ml-2 text-[11px] text-slate-500 font-mono">workflow.ts</span>
+              <span className="ml-2 text-[11px] text-slate-500 font-mono">purchase-order.ts</span>
             </div>
-            <pre className="text-[12.5px] leading-relaxed text-slate-300 font-mono px-5 py-4 overflow-x-auto">
-              <code>{CODE_SNIPPET}</code>
-            </pre>
+            <div style={{ height: 380 }}>
+              <Editor
+                path="file:///purchase-order-preview.ts"
+                language="typescript"
+                value={purchaseOrderSource}
+                theme="vs-dark"
+                beforeMount={(monaco: Monaco) => setupMonacoTypes(monaco)}
+                options={{
+                  readOnly: true,
+                  fontSize: 12.5,
+                  fontFamily: '"Cascadia Code", "JetBrains Mono", "Fira Code", Menlo, monospace',
+                  minimap: { enabled: false },
+                  scrollBeyondLastLine: false,
+                  lineNumbers: 'on',
+                  renderLineHighlight: 'none',
+                  wordWrap: 'off',
+                  tabSize: 2,
+                  padding: { top: 12, bottom: 12 },
+                  automaticLayout: true,
+                  scrollbar: { verticalScrollbarSize: 4, horizontalScrollbarSize: 4 },
+                  hover: { enabled: true },
+                  fixedOverflowWidgets: true,
+                  folding: false,
+                  glyphMargin: false,
+                  contextmenu: false,
+                }}
+              />
+            </div>
           </div>
         </div>
       </section>

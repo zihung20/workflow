@@ -13,6 +13,7 @@ import { useRunState } from '../designer/hooks/useRunState';
 import { useTheme } from '../context/ThemeContext';
 
 import type { DesignerWorkflow, DesignerNode, DesignerEdge, Selection } from '../designer/types';
+import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
 import { SchemaEditor } from '../designer/code/SchemaEditor';
 
@@ -104,61 +105,59 @@ export default function DesignerPage() {
         <div className="flex-1" />
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={toggleTheme}
+          <Button
+            variant="ghost"
+            size="sm"
             title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-            className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-sm transition-colors px-1"
+            onClick={toggleTheme}
           >
             {theme === 'dark' ? '☀' : '☾'}
-          </button>
-          <button
-            onClick={() => {
-              resetToDefault();
-              setSelection({ type: 'none' });
-            }}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             title="Reset canvas to default (clears localStorage)"
-            className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+            onClick={() => { resetToDefault(); setSelection({ type: 'none' }); }}
           >
             Reset
-          </button>
+          </Button>
           <Link
             to="/examples/purchase-order"
             className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
           >
             Examples
           </Link>
-          {/* Context / settings panel toggle */}
-          <button
-            onClick={() => setSelection(s => s.type === 'settings' ? { type: 'none' } : { type: 'settings' })}
+          <Button
+            variant={selection.type === 'settings' ? 'secondary' : 'outline'}
+            size="sm"
             title="Workflow context & settings"
-            className={`text-xs border rounded px-2.5 py-1 transition-colors ${
-              selection.type === 'settings'
-                ? 'bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 border-slate-300 dark:border-slate-600'
-                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 border-slate-200 dark:border-slate-700'
-            }`}
+            onClick={() => setSelection(s => s.type === 'settings' ? { type: 'none' } : { type: 'settings' })}
           >
             Context
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => setShowCode(true)}
-            className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 border border-slate-200 dark:border-slate-700 rounded px-2.5 py-1 transition-colors"
           >
-            {'</>'}  Show Code
-          </button>
+            {'</>'} Show Code
+          </Button>
           {isRunning && (
-            <button
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => setRunState({ mode: 'idle' })}
-              className="text-xs bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded px-3 py-1.5 transition-colors"
             >
               Close
-            </button>
+            </Button>
           )}
-          <button
+          <Button
+            size="sm"
+            className="bg-blue-600 hover:bg-blue-500 text-white font-medium"
             onClick={() => { void handleRun(workflow); }}
-            className="text-xs bg-blue-600 hover:bg-blue-500 text-white rounded px-3 py-1.5 font-medium transition-colors flex items-center gap-1.5"
           >
-            <span>▶</span> Run
-          </button>
+            ▶ Run
+          </Button>
         </div>
       </header>
 
@@ -180,13 +179,15 @@ export default function DesignerPage() {
               <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 {selection.type === 'settings' ? 'Workflow' : selectedNode ? 'State' : 'Transition'}
               </span>
-              <button
-                onClick={() => setSelection({ type: 'none' })}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-sm transition-colors"
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
                 title="Close panel"
+                onClick={() => setSelection({ type: 'none' })}
               >
                 ✕
-              </button>
+              </Button>
             </div>
 
             {/* Workflow settings panel */}
@@ -238,12 +239,14 @@ export default function DesignerPage() {
       {runState.mode === 'error' && (
         <div className="shrink-0 px-4 py-2.5 bg-red-50 dark:bg-red-950 border-t border-red-200 dark:border-red-800 flex items-center gap-3">
           <span className="text-xs text-red-700 dark:text-red-300 flex-1">⚠ {runState.message}</span>
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-red-400 hover:text-red-600"
             onClick={() => setRunState({ mode: 'idle' })}
-            className="text-red-400 hover:text-red-600 dark:hover:text-red-300 transition-colors"
           >
             ✕
-          </button>
+          </Button>
         </div>
       )}
 

@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { createWorkflow, Guard, StateStatus } from 'flowyd';
-import type { WorkflowInstance, InstanceSnapshot } from 'flowyd';
 
 // ─── Grid geometry ────────────────────────────────────────────────────────────
 
@@ -102,21 +101,12 @@ export const ewcrWorkflow = createWorkflow({
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type EwcrInstance = WorkflowInstance<{
-  REQUEST_ISOLATION: z.infer<typeof RequestIsolationSchema>;
-  CONFIRM_ISOLATION: z.infer<typeof ConfirmIsolationSchema>;
-  ISSUE_CLEARANCE:   z.infer<typeof IssueClearanceSchema>;
-  START_WORK:        z.infer<typeof StartWorkSchema>;
-  COMPLETE_WORK:     z.infer<typeof CompleteWorkSchema>;
-  RESTORE_POWER:     z.infer<typeof RestorePowerSchema>;
-}>;
+export type EwcrInstance = ReturnType<typeof ewcrWorkflow.createInstance>;
 
 // ─── Guard wiring ─────────────────────────────────────────────────────────────
 
-function getSnap(inst: EwcrInstance): InstanceSnapshot {
-  // WorkflowInstance.getSnapshot() is public — no cast needed.
-  // Using a local alias so the guard closures stay readable.
-  return (inst as unknown as { getSnapshot(): InstanceSnapshot }).getSnapshot();
+function getSnap(inst: EwcrInstance) {
+  return inst.getSnapshot();
 }
 
 export function wireAllGuards(instances: Map<string, EwcrInstance>): void {

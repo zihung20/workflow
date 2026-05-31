@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { createWorkflow } from 'flowyd';
-import type { WorkflowInstance } from 'flowyd';
 
 const BriefingSchema = z.object({
   trainId:   z.string().min(1),
@@ -58,12 +57,4 @@ export const predepartureWorkflow = createWorkflow({
 
   .build();
 
-export type PredepartureInstance = WorkflowInstance<{
-  BRIEFING_RECEIVED: z.infer<typeof BriefingSchema>;
-  START_INSPECTION:  Record<never, never>;
-  MECH_OK:           z.infer<typeof InspectionSchema>;
-  ELEC_OK:           z.infer<typeof InspectionSchema>;
-  SAFETY_OK:         z.infer<typeof InspectionSchema>;
-  SIGN_OFF:          z.infer<typeof SignOffSchema>;
-  DEPART:            z.infer<typeof DepartSchema>;
-}>;
+export type PredepartureInstance = ReturnType<typeof predepartureWorkflow.createInstance>;

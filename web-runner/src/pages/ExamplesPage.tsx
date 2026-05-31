@@ -5,6 +5,7 @@ import { EwcrRunner } from '../runners/EwcrRunner';
 import { purchaseOrderWorkflow } from '../workflows/purchase-order';
 import { predepartureWorkflow } from '../workflows/predeparture';
 import { incidentWorkflow } from '../workflows/incident';
+import { releasePipelineWorkflow } from '../workflows/release-pipeline';
 
 const EXAMPLES = [
   {
@@ -22,8 +23,14 @@ const EXAMPLES = [
   {
     id: 'incident',
     label: 'IT Incident',
-    tags: ['inline guard', 'inject guard'],
-    desc: 'Inline payload guards + a named injected guard for management sign-off',
+    tags: ['context', 'fork/join', 'wait', 'guard.and'],
+    desc: 'Parallel investigation tracks, vendor WaitState, context-aware guards, three terminal states',
+  },
+  {
+    id: 'release-pipeline',
+    label: 'Release Pipeline',
+    tags: ['50 states', 'context', '8× fork/join', 'wait'],
+    desc: '50-state multi-environment release: 8 parallel phases, WaitState observation, Guard.and CTO gate',
   },
   {
     id: 'ewcr',
@@ -43,9 +50,27 @@ function makePdInstance() {
   return predepartureWorkflow.createInstance(`pd-${Date.now()}`);
 }
 
+function makeReleasePipelineInstance() {
+  const inst = releasePipelineWorkflow.createInstance(`rel-${Date.now()}`, {
+    version:     '2.4.0',
+    releaseType: 'minor',
+    isEmergency: false,
+    teamId:      'platform-eng',
+  });
+  // All director / lead guards auto-approve in the demo
+  for (const name of ['qa-lead', 'engineering-director', 'security-director', 'product-director', 'cto']) {
+    inst.injectGuard(name, () => true);
+  }
+  return inst;
+}
+
 function makeIncidentInstance() {
-  const inst = incidentWorkflow.createInstance(`inc-${Date.now()}`);
-  inst.injectGuard('management-sign-off', () => true);
+  const inst = incidentWorkflow.createInstance(`inc-${Date.now()}`, {
+    severity:       'P2',
+    isDataBreach:   false,
+    affectedSystem: 'payments-api',
+  });
+  inst.injectGuard('incident-manager', () => true);
   return inst;
 }
 
@@ -126,6 +151,15 @@ export default function ExamplesPage() {
             subtitle="Inline payload guards + injected management sign-off guard"
             definition={incidentWorkflow.getDefinition()}
             makeInstance={makeIncidentInstance}
+          />
+        )}
+        {exId === 'release-pipeline' && (
+          <SingleRunner
+            key="rel"
+            title="Production Release Pipeline"
+            subtitle="50 states · 8 parallel phases · WaitState observation · Guard.and CTO gate"
+            definition={releasePipelineWorkflow.getDefinition()}
+            makeInstance={makeReleasePipelineInstance}
           />
         )}
         {exId === 'ewcr' && <EwcrRunner key="ewcr" />}

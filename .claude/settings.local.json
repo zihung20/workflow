@@ -30,7 +30,8 @@
       "Bash(npx license-checker *)",
       "Bash(pnpm test:perf *)",
       "Bash(printf 'pnpm test:perf\\\\n')",
-      "Bash(python3 *)"
+      "Bash(python3 *)",
+      "Bash(pnpm tsc *)"
     ]
   }
 }
