@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import Editor, { useMonaco } from '@monaco-editor/react';
 import type { Monaco } from '@monaco-editor/react';
 import { setupMonacoTypes, updateGuardContextTypes } from './monacoSetup';
@@ -30,8 +30,16 @@ export function GuardEditor({ edgeId, nodeIds, payloadZodBody = '', contextZodBo
     updateGuardContextTypes(monaco, ids, p, c);
   }
 
+  const codeFontStyle: React.CSSProperties = {
+    fontFamily: '"Cascadia Code", "JetBrains Mono", "Fira Code", Menlo, monospace',
+    fontSize: 12,
+  };
+
   return (
-    <div className="rounded border border-border overflow-hidden">
+    <div className="rounded border border-border overflow-hidden" onKeyDown={e => e.stopPropagation()}>
+      <div style={codeFontStyle} className="px-3 py-1 bg-[#1e1e1e] text-zinc-500 border-b border-border select-none">
+        {'async (ctx) => {'}
+      </div>
       <Editor
         path={`file:///guard-${edgeId}.ts`}
         height="150px"
@@ -61,6 +69,9 @@ export function GuardEditor({ edgeId, nodeIds, payloadZodBody = '', contextZodBo
           fixedOverflowWidgets: true,
         }}
       />
+      <div style={codeFontStyle} className="px-3 py-1 bg-[#1e1e1e] text-zinc-500 border-t border-border select-none">
+        {'}'}
+      </div>
     </div>
   );
 }

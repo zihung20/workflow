@@ -13,5 +13,6 @@
     "isolatedModules": true,
     "noEmit": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/types/zod.bundle.d.ts", "src/types/flowyd.bundle.d.ts"]
 }

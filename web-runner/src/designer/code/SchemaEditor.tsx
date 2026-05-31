@@ -24,7 +24,7 @@ export function SchemaEditor({ id, value, onChange }: Props) {
   }
 
   return (
-    <div className="rounded border border-border overflow-hidden">
+    <div className="rounded border border-border overflow-hidden" onKeyDown={e => e.stopPropagation()}>
       <Editor
         path={`file:///schema-${id}.ts`}
         height="80px"
