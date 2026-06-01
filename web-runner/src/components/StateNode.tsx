@@ -31,7 +31,7 @@ export function StateNode({ data }: NodeProps<StateNodeType>) {
 
   return (
     <div className={`rounded-lg border-2 px-3 py-2 min-w-[130px] text-center shadow-sm ${colorCls}`}>
-      <Handle type="target" position={Position.Top} className="!bg-slate-400" />
+      <Handle type="target" position={Position.Left} className="!bg-slate-400" />
 
       <p className="text-xs font-semibold leading-tight">
         {data.label}
@@ -43,7 +43,7 @@ export function StateNode({ data }: NodeProps<StateNodeType>) {
       {data.isInitial  ? <span className="text-[9px] opacity-50 block">▶ initial</span> : null}
       {data.isTerminal ? <span className="text-[9px] opacity-50 block">■ terminal</span> : null}
 
-      <Handle type="source" position={Position.Bottom} className="!bg-slate-400" />
+      <Handle type="source" position={Position.Right} className="!bg-slate-400" />
     </div>
   );
 }

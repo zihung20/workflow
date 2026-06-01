@@ -125,7 +125,7 @@ const snapshot = inst.getSnapshot(); // plain JSON — save wherever you want
 - **Rewind** — `instance.rewind(version)` returns an independent deep-cloned `InstanceSnapshot<TContext>` for any past version, with accurate stateStatuses and context
 - **Typed instance queries** — `getCurrentStates()` returns `TStates[]`; `getAvailableTransitions()` returns `(keyof TActions & string)[]`; state-ID and action-name unions propagate from the builder all the way to the instance
 - **Composable guards** — `Guard.inject`, `Guard.fn`, `Guard.and`, `Guard.or`, `Guard.not`
-- **Built-in visualization** — Mermaid `stateDiagram-v2` and JSON graph for React Flow / D3
+- **Built-in visualization** — Mermaid `stateDiagram-v2` and JSON graph for React Flow / D3; both exporters emit fork fan-out and join fan-in edges so the full fork/join topology is visible without explicit transitions
 
 ---
 

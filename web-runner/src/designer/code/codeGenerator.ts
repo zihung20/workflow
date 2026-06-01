@@ -4,18 +4,9 @@ function topoSort(nodes: DesignerNode[], edges: DesignerEdge[]): DesignerNode[] 
   const deps = new Map<string, Set<string>>();
   for (const node of nodes) deps.set(node.id, new Set());
 
-  for (const node of nodes) {
-    if (node.kind === 'fork') {
-      for (const t of node.forkTargets) deps.get(node.id)?.add(t);
-    }
-    if (node.kind === 'join') {
-      for (const r of node.joinRequires) deps.get(node.id)?.add(r);
-    }
-  }
-
-  const forkTargetEdges = edges.filter(e => e.kind === 'fork-target');
-  for (const edge of forkTargetEdges) {
-    deps.get(edge.fromNodeId)?.add(edge.toNodeId);
+  for (const edge of edges) {
+    if (edge.kind === 'fork-target') deps.get(edge.fromNodeId)?.add(edge.toNodeId);
+    if (edge.kind === 'join-requires') deps.get(edge.toNodeId)?.add(edge.fromNodeId);
   }
 
   const sorted: DesignerNode[] = [];
@@ -57,6 +48,13 @@ export function generateCode(wf: DesignerWorkflow): string {
     forkTargetMap.set(edge.fromNodeId, arr);
   }
 
+  const joinRequiresMap = new Map<string, string[]>();
+  for (const edge of edges.filter(e => e.kind === 'join-requires')) {
+    const arr = joinRequiresMap.get(edge.toNodeId) ?? [];
+    arr.push(edge.fromNodeId);
+    joinRequiresMap.set(edge.toNodeId, arr);
+  }
+
   const lines: string[] = [
     `import { createWorkflow } from 'flowyd';`,
     `import { z } from 'zod';`,
@@ -94,7 +92,7 @@ export function generateCode(wf: DesignerWorkflow): string {
       const targetsStr = targets.map(t => `'${t}'`).join(', ');
       lines.push(indent(`.addFork('${node.id}', { label: ${JSON.stringify(node.label)}, targets: [${targetsStr}] })`));
     } else if (node.kind === 'join') {
-      const requires = node.joinRequires;
+      const requires = joinRequiresMap.get(node.id) ?? [];
       const requiresStr = requires.map(r => `'${r}'`).join(', ');
       const modeStr = typeof node.joinMode === 'number'
         ? String(node.joinMode)
@@ -137,12 +135,12 @@ export const DEFAULT_WORKFLOW: DesignerWorkflow = {
     {
       id: 'start', kind: 'step', label: 'Start',
       isInitial: true, isTerminal: false,
-      forkTargets: [], joinRequires: [], joinMode: 'all', waitExternalName: '',
+      forkTargets: [], joinMode: 'all', waitExternalName: '',
     },
     {
       id: 'end', kind: 'step', label: 'End',
       isInitial: false, isTerminal: true,
-      forkTargets: [], joinRequires: [], joinMode: 'all', waitExternalName: '',
+      forkTargets: [], joinMode: 'all', waitExternalName: '',
     },
   ],
   edges: [

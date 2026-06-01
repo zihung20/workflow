@@ -2,11 +2,8 @@ import { Label } from '../../components/ui/label';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { SchemaEditor } from '../code/SchemaEditor';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '../../components/ui/select';
 import { GuardEditor } from '../code/GuardEditor';
-import type { DesignerEdge, DesignerWorkflow, EdgeKind } from '../types';
+import type { DesignerEdge, DesignerWorkflow } from '../types';
 
 interface Props {
   edge: DesignerEdge;
@@ -31,7 +28,7 @@ export function EdgePanel({ edge, workflow, onChange, onSchemaChange, onDelete }
     onChange({ ...edge, [k]: v });
   }
 
-  const isFork = edge.kind === 'fork-target';
+  const isAutoEdge = edge.kind === 'fork-target' || edge.kind === 'join-requires';
   const nodeIds = workflow.nodes.map(n => n.id);
   const payloadZodBody = workflow.actionSchemas[edge.actionName] ?? '';
   const contextZodBody = workflow.contextSchemaBody;
@@ -46,17 +43,7 @@ export function EdgePanel({ edge, workflow, onChange, onSchemaChange, onDelete }
         <span className="text-foreground font-medium">{edge.toNodeId}</span>
       </div>
 
-      <Field label="Edge type">
-        <Select value={edge.kind} onValueChange={v => set('kind', v as EdgeKind)}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="transition">transition — triggered by dispatching an action</SelectItem>
-            <SelectItem value="fork-target">fork-target — activated automatically by a Fork state</SelectItem>
-          </SelectContent>
-        </Select>
-      </Field>
-
-      {!isFork && (
+      {!isAutoEdge && (
         <>
           <Field label="Action name" hint="Convention: ALL_CAPS — must match a defineAction() call.">
             <Input
@@ -94,7 +81,7 @@ export function EdgePanel({ edge, workflow, onChange, onSchemaChange, onDelete }
       )}
 
       <Button variant="destructive" size="sm" className="w-full" onClick={onDelete}>
-        Delete transition
+        Delete {isAutoEdge ? 'connection' : 'transition'}
       </Button>
     </div>
   );

@@ -7,8 +7,8 @@ const Empty = z.object({});
 /**
  * Procurement SOP: start → fork(legal, finance) → join(all) → approved
  *
- *   start ──START──▶ fork ──▶ legal ──LEGAL_DONE──▶ ┐
- *                         └──▶ finance ──FINANCE_DONE──▶ join(all) ──FINALIZE──▶ approved
+ *   start ──START──▶ fork ──▶ legal ──LEGAL_DONE──▶ legal-approved (auto) ──▶ ┐
+ *                         └──▶ finance ──FINANCE_DONE──▶ finance-approved (auto) ──▶ join(all) ──FINALIZE──▶ approved
  */
 const procurement = createWorkflow({
   name: 'procurement',
@@ -18,17 +18,21 @@ const procurement = createWorkflow({
   .defineAction('FINANCE_DONE', Empty)
   .defineAction('FINALIZE', Empty)
   .addStep('start')
+  // done states must be registered before the join that requires them
+  .addStep('legal-approved')
+  .addStep('finance-approved')
+  // fork targets
   .addStep('legal')
   .addStep('finance')
   .addFork('fork', { targets: ['legal', 'finance'] })
-  .addJoin('join', { requires: ['legal', 'finance'], mode: 'all' })
+  .addJoin('join', { requires: ['legal-approved', 'finance-approved'], mode: 'all' })
   .addStep('approved')
   .setInitial('start')
   .setTerminal(['approved'])
-  .addTransition({ from: 'start', to: 'fork', on: 'START' })
-  .addTransition({ from: 'legal', to: 'join', on: 'LEGAL_DONE' })
-  .addTransition({ from: 'finance', to: 'join', on: 'FINANCE_DONE' })
-  .addTransition({ from: 'join', to: 'approved', on: 'FINALIZE' })
+  .addTransition({ from: 'start',   to: 'fork',             on: 'START' })
+  .addTransition({ from: 'legal',   to: 'legal-approved',   on: 'LEGAL_DONE' })
+  .addTransition({ from: 'finance', to: 'finance-approved', on: 'FINANCE_DONE' })
+  .addTransition({ from: 'join',    to: 'approved',         on: 'FINALIZE' })
   .build();
 
 describe('Parallel-join SOP — procurement', () => {
@@ -43,7 +47,7 @@ describe('Parallel-join SOP — procurement', () => {
     const inst = procurement.createInstance('prc-002');
     await inst.dispatch('START', {});
     await inst.dispatch('LEGAL_DONE', {});
-    // Only legal is done — join must still be idle
+    // legal → legal-approved (auto-complete), finance still active → join idle
     const states = inst.getCurrentStates().sort();
     expect(states).toContain('finance');
     expect(states).not.toContain('join');
@@ -86,7 +90,10 @@ describe('Parallel-join SOP — procurement', () => {
     await inst.dispatch('LEGAL_DONE', {});
     const snap = inst.getSnapshot();
 
+    // legal transitioned out → Completed; legal-approved auto-completed → Completed
     expect(snap.stateStatuses['legal']).toBe('completed');
+    expect(snap.stateStatuses['legal-approved']).toBe('completed');
+    // finance still in progress
     expect(snap.stateStatuses['finance']).toBe('active');
     expect(snap.stateStatuses['join']).toBe('idle');
   });
@@ -96,8 +103,8 @@ describe('Parallel-join SOP — procurement', () => {
  * Any-join variant: activates once at least one of the required branches
  * completes. Uses mode: 'any'.
  *
- *   start ──GO──▶ fork ──▶ branch-a ──DONE_A──▶ ┐
- *                       └──▶ branch-b ──DONE_B──▶ join(any) ──PROCEED──▶ end
+ *   start ──GO──▶ fork ──▶ branch-a ──DONE_A──▶ a-done (auto) ──▶ ┐
+ *                       └──▶ branch-b ──DONE_B──▶ b-done (auto) ──▶ join(any) ──PROCEED──▶ end
  */
 const anyJoin = createWorkflow({
   name: 'any-join',
@@ -107,17 +114,21 @@ const anyJoin = createWorkflow({
   .defineAction('DONE_B', Empty)
   .defineAction('PROCEED', Empty)
   .addStep('start')
+  // done states before join
+  .addStep('a-done')
+  .addStep('b-done')
+  // fork targets
   .addStep('branch-a')
   .addStep('branch-b')
   .addFork('fork', { targets: ['branch-a', 'branch-b'] })
-  .addJoin('join', { requires: ['branch-a', 'branch-b'], mode: 'any' })
+  .addJoin('join', { requires: ['a-done', 'b-done'], mode: 'any' })
   .addStep('end')
   .setInitial('start')
   .setTerminal(['end'])
-  .addTransition({ from: 'start', to: 'fork', on: 'GO' })
-  .addTransition({ from: 'branch-a', to: 'join', on: 'DONE_A' })
-  .addTransition({ from: 'branch-b', to: 'join', on: 'DONE_B' })
-  .addTransition({ from: 'join', to: 'end', on: 'PROCEED' })
+  .addTransition({ from: 'start',    to: 'fork',   on: 'GO' })
+  .addTransition({ from: 'branch-a', to: 'a-done', on: 'DONE_A' })
+  .addTransition({ from: 'branch-b', to: 'b-done', on: 'DONE_B' })
+  .addTransition({ from: 'join',     to: 'end',    on: 'PROCEED' })
   .build();
 
 describe('Any-join — fires on first branch completion', () => {
@@ -125,7 +136,7 @@ describe('Any-join — fires on first branch completion', () => {
     const inst = anyJoin.createInstance('aj-001');
     await inst.dispatch('GO', {});
     await inst.dispatch('DONE_A', {});
-    // join should be active now even though branch-b is still active
+    // a-done auto-completes → join requires any of [a-done, b-done] → 1 ≥ 1 → active
     expect(inst.getStateStatus('join')).toBe('active');
   });
 

@@ -26,7 +26,7 @@ function savePositions(nodes: Node[]): void {
 }
 
 function wfStructureKey(wf: DesignerWorkflow): string {
-  const n = wf.nodes.map(n => `${n.id}:${n.kind}:${n.label}:${n.isInitial ? 1 : 0}:${n.isTerminal ? 1 : 0}:${n.forkTargets.join(',')}:${n.joinRequires.join(',')}`).join('|');
+  const n = wf.nodes.map(n => `${n.id}:${n.kind}:${n.label}:${n.isInitial ? 1 : 0}:${n.isTerminal ? 1 : 0}:${n.forkTargets.join(',')}`).join('|');
   const e = wf.edges.map(e => `${e.id}:${e.fromNodeId}:${e.toNodeId}:${e.kind}:${e.actionName}`).join('|');
   return `${wf.name}||${n}||${e}`;
 }
@@ -48,50 +48,43 @@ function wfToRfNodes(
 }
 
 function wfToRfEdges(wf: DesignerWorkflow): Edge[] {
-  const edges: Edge[] = wf.edges.map(e => ({
-    id: e.id,
-    source: e.fromNodeId,
-    target: e.toNodeId,
-    label: e.kind === 'fork-target' ? '⑂ auto' : (e.actionName || '—'),
-    animated: false,
-    style: e.kind === 'fork-target'
-      ? { strokeDasharray: '5 3', stroke: '#7c3aed', strokeWidth: 1.5 }
-      : { stroke: '#64748b', strokeWidth: 1.5 },
-    labelStyle: { fontSize: 11, fontFamily: 'monospace' },
-    labelBgStyle: { fill: '#0f172a', fillOpacity: 0.9 },
-    data: {} as Record<string, unknown>,
-  }));
-
-  // Synthetic join-requires edges — visual only, not stored in wf.edges.
-  // Derived from node.joinRequires so they stay in sync with the NodePanel checkboxes.
-  for (const node of wf.nodes) {
-    if (node.kind !== 'join') continue;
-    for (const reqId of node.joinRequires) {
-      edges.push({
-        id: `__jr-${reqId}-${node.id}`,
-        source: reqId,
-        target: node.id,
-        label: '⑁ requires',
-        animated: false,
-        deletable: false,
-        selectable: false,
-        focusable: false,
+  return wf.edges.map(e => {
+    if (e.kind === 'fork-target') {
+      return {
+        id: e.id, source: e.fromNodeId, target: e.toNodeId,
+        label: '⑂ auto', animated: false,
+        style: { strokeDasharray: '5 3', stroke: '#7c3aed', strokeWidth: 1.5 },
+        labelStyle: { fontSize: 11, fontFamily: 'monospace' },
+        labelBgStyle: { fill: '#0f172a', fillOpacity: 0.9 },
+        data: {} as Record<string, unknown>,
+      };
+    }
+    if (e.kind === 'join-requires') {
+      return {
+        id: e.id, source: e.fromNodeId, target: e.toNodeId,
+        label: '⑁ requires', animated: false,
         style: { strokeDasharray: '5 3', stroke: '#0ea5e9', strokeWidth: 1.5 },
         labelStyle: { fontSize: 11, fontFamily: 'monospace' },
         labelBgStyle: { fill: '#0f172a', fillOpacity: 0.9 },
         data: {} as Record<string, unknown>,
-      });
+      };
     }
-  }
-
-  return edges;
+    return {
+      id: e.id, source: e.fromNodeId, target: e.toNodeId,
+      label: e.actionName || '—', animated: false,
+      style: { stroke: '#64748b', strokeWidth: 1.5 },
+      labelStyle: { fontSize: 11, fontFamily: 'monospace' },
+      labelBgStyle: { fill: '#0f172a', fillOpacity: 0.85 },
+      data: {} as Record<string, unknown>,
+    };
+  });
 }
 
 let nodeCounter = 1;
 function makeNewNode(kind: NodeKind, existingIds: Set<string>): DesignerNode {
   let id: string;
   do { id = `${kind}-${nodeCounter++}`; } while (existingIds.has(id));
-  return { id, kind, label: id, isInitial: false, isTerminal: false, forkTargets: [], joinRequires: [], joinMode: 'all', waitExternalName: '' };
+  return { id, kind, label: id, isInitial: false, isTerminal: false, forkTargets: [], joinMode: 'all', waitExternalName: '' };
 }
 
 interface Props {
@@ -129,7 +122,7 @@ export function DesignerCanvas({ workflow, selection, onWorkflowChange, onSelect
     })));
     setRfEdges(prev => prev.map(e => ({
       ...e,
-      selected: selection.type === 'edge' && selection.id === (e.data as Record<string, unknown>)?.edgeId,
+      selected: selection.type === 'edge' && selection.id === e.id,
     })));
   }, [selection, setRfNodes, setRfEdges]);
 
@@ -164,7 +157,6 @@ export function DesignerCanvas({ workflow, selection, onWorkflowChange, onSelect
     onRfEdgesChange(changes);
     for (const change of changes) {
       if (change.type === 'remove') {
-        // ReactFlow edge ID equals DesignerEdge.id (set identically in handleConnect and wfToRfEdges)
         onWorkflowChange({ ...workflow, edges: workflow.edges.filter(e => e.id !== change.id) });
         onSelectionChange({ type: 'none' });
         return;
@@ -179,19 +171,15 @@ export function DesignerCanvas({ workflow, selection, onWorkflowChange, onSelect
     const sourceNode = workflow.nodes.find(n => n.id === from);
     const targetNode = workflow.nodes.find(n => n.id === to);
 
-    // Drawing to a join auto-adds the source to that join's requires list.
-    // A synthetic visual edge is rendered from node.joinRequires — no stored edge needed.
+    let kind: DesignerEdge['kind'];
     if (targetNode?.kind === 'join') {
-      const updatedNodes = workflow.nodes.map(n =>
-        n.id === to && !n.joinRequires.includes(from)
-          ? { ...n, joinRequires: [...n.joinRequires, from] }
-          : n,
-      );
-      onWorkflowChange({ ...workflow, nodes: updatedNodes });
-      return;
+      kind = 'join-requires';
+    } else if (sourceNode?.kind === 'fork') {
+      kind = 'fork-target';
+    } else {
+      kind = 'transition';
     }
 
-    const kind: DesignerEdge['kind'] = sourceNode?.kind === 'fork' ? 'fork-target' : 'transition';
     const newEdge: DesignerEdge = {
       id: `e-${from}-${to}-${Date.now()}`,
       fromNodeId: from, toNodeId: to, kind,
@@ -200,12 +188,18 @@ export function DesignerCanvas({ workflow, selection, onWorkflowChange, onSelect
     };
     onWorkflowChange({ ...workflow, edges: [...workflow.edges, newEdge] });
     onSelectionChange({ type: 'edge', id: newEdge.id });
-    // Immediately add to rfEdges for instant visual feedback; the useEffect
-    // will reconcile it on the next render cycle from the updated workflow prop.
+
+    const edgeStyle = kind === 'fork-target'
+      ? { strokeDasharray: '5 3', stroke: '#7c3aed', strokeWidth: 1.5 }
+      : kind === 'join-requires'
+        ? { strokeDasharray: '5 3', stroke: '#0ea5e9', strokeWidth: 1.5 }
+        : { stroke: '#64748b', strokeWidth: 1.5 };
+    const edgeLabel = kind === 'fork-target' ? '⑂ auto' : kind === 'join-requires' ? '⑁ requires' : 'ACTION';
+
     setRfEdges(es => [...es, {
       id: newEdge.id, source: from, target: to,
-      label: kind === 'fork-target' ? '⑂ auto' : 'ACTION',
-      style: kind === 'fork-target' ? { strokeDasharray: '5 3', stroke: '#7c3aed', strokeWidth: 1.5 } : { stroke: '#64748b', strokeWidth: 1.5 },
+      label: edgeLabel,
+      style: edgeStyle,
       labelStyle: { fontSize: 11, fontFamily: 'monospace' },
       labelBgStyle: { fill: '#0f172a', fillOpacity: 0.85 },
       data: {} as Record<string, unknown>,

@@ -26,16 +26,25 @@ export interface JsonGraphNode {
 
 /**
  * A directed edge in the serialised JSON graph.
+ *
+ * - `'transition'` — a user-defined action-triggered transition.
+ * - `'fork-target'` — structural fan-out edge from a `ForkState` to one of its targets.
+ * - `'join-requires'` — structural fan-in edge from a prerequisite state to a `JoinState`.
+ *
+ * Structural edges carry no `action` or `hasGuard`; they exist purely to make
+ * the fork/join topology visible to renderers without requiring explicit transitions.
  */
 export interface JsonGraphEdge {
   /** Auto-generated opaque identifier — do not parse or persist. Treat as stable only within a single export call. */
   id: string;
   from: string;
   to: string;
-  /** The action name that triggers this transition. */
-  action: string;
-  /** `true` when this transition has a guard attached. */
-  hasGuard: boolean;
+  /** Discriminates structural edges from user-defined transitions. */
+  kind: 'transition' | 'fork-target' | 'join-requires';
+  /** The action name that triggers this transition. Only present when `kind === 'transition'`. */
+  action?: string;
+  /** `true` when this transition has a guard attached. Only present when `kind === 'transition'`. */
+  hasGuard?: boolean;
 }
 
 /**
@@ -102,9 +111,23 @@ export const JsonGraphExporter: IExporter<JsonGraph> = {
       id: `${t.from}__${t.on}__${t.to}__${i}`,
       from: t.from,
       to: t.to,
+      kind: 'transition' as const,
       action: t.on,
       hasGuard: t.guard !== undefined,
     }));
+
+    // Structural fork fan-out and join fan-in edges — symmetric with MermaidExporter.
+    for (const [id, state] of definition.states) {
+      if (state.kind === StateKind.Fork) {
+        for (const target of state.targets) {
+          edges.push({ id: `fork__${id}__${target}`, from: id, to: target, kind: 'fork-target' });
+        }
+      } else if (state.kind === StateKind.Join) {
+        for (const req of state.requires) {
+          edges.push({ id: `join__${req}__${id}`, from: req, to: id, kind: 'join-requires' });
+        }
+      }
+    }
 
     return {
       name: definition.name,

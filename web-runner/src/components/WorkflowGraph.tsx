@@ -68,6 +68,22 @@ function toFlowNodes(
 
 function toFlowEdges(graph: JsonGraph): Edge[] {
   return graph.edges.map((e) => {
+    if (e.kind === 'fork-target') {
+      return {
+        id: e.id, source: e.from, target: e.to,
+        label: '⑂ auto', animated: false,
+        style: { strokeDasharray: '5 3', stroke: '#7c3aed', strokeWidth: 1.5 },
+        labelStyle: { fontSize: 11, fontFamily: 'monospace' },
+      };
+    }
+    if (e.kind === 'join-requires') {
+      return {
+        id: e.id, source: e.from, target: e.to,
+        label: '⑁ requires', animated: false,
+        style: { strokeDasharray: '5 3', stroke: '#0ea5e9', strokeWidth: 1.5 },
+        labelStyle: { fontSize: 11, fontFamily: 'monospace' },
+      };
+    }
     const sourceStatus = graph.nodes.find((n) => n.id === e.from)?.status;
     return {
       id:       e.id,
@@ -94,18 +110,20 @@ export function WorkflowGraph() {
   const edges: Edge[] = useMemo(() => toFlowEdges(graph), [graph]);
 
   return (
-    <ReactFlow
-      nodes={nodes}
-      edges={edges}
-      nodeTypes={nodeTypes}
-      nodesDraggable={false}
-      nodesConnectable={false}
-      elementsSelectable={false}
-      fitView
-      fitViewOptions={{ padding: 0.25 }}
-    >
-      <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
-      <Controls showInteractive={false} />
-    </ReactFlow>
+    <div className="flex-1 min-h-0">
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        nodesDraggable={false}
+        nodesConnectable={false}
+        elementsSelectable={false}
+        fitView
+        fitViewOptions={{ padding: 0.25 }}
+      >
+        <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
+        <Controls showInteractive={false} />
+      </ReactFlow>
+    </div>
   );
 }

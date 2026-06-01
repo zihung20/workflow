@@ -130,7 +130,7 @@ const closeGuard = Guard.and([
   Guard.fn<z.infer<typeof CloseSchema>, z.infer<typeof IncidentContextSchema>>(
     (ctx) =>
       !ctx.context.isDataBreach ||
-      ctx.instanceState.isStateCompleted('stakeholders-notified'),
+      ctx.instanceState.isStateCompleted('stakeholders-confirmed'),
   ),
 ]);
 
@@ -156,20 +156,28 @@ export const incidentWorkflow = createWorkflow({ name: 'it-incident-response' })
   .defineAction('ESCALATE',             EscalateSchema)
 
   // Parallel investigation branches (must precede their fork)
+  // done states — auto-complete; join waits on these
+  .addStep('root-cause-documented',    { label: 'Root Cause Documented' })
+  .addStep('stakeholders-confirmed',   { label: 'Stakeholders Confirmed' })
+  // in-progress states — fork targets
   .addStep('root-cause-analysis',   { label: 'Root Cause Analysis' })
   .addStep('stakeholders-notified', { label: 'Stakeholders Notified' })
   .addFork('investigation-fork', { label: 'Investigation Fork',
     targets: ['root-cause-analysis', 'stakeholders-notified'] })
   .addJoin('investigation-join', { label: 'Investigation Complete',
-    requires: ['root-cause-analysis', 'stakeholders-notified'], mode: 'all' })
+    requires: ['root-cause-documented', 'stakeholders-confirmed'], mode: 'all' })
 
   // Parallel post-incident review branches (must precede their fork)
+  // done states — auto-complete; join waits on these
+  .addStep('tech-review-complete',    { label: 'Tech Review Complete' })
+  .addStep('post-mortem-complete',    { label: 'Post-mortem Complete' })
+  // in-progress states — fork targets
   .addStep('technical-review', { label: 'Technical Review' })
   .addStep('post-mortem-draft', { label: 'Post-mortem Draft' })
   .addFork('review-fork', { label: 'Review Fork',
     targets: ['technical-review', 'post-mortem-draft'] })
   .addJoin('review-join', { label: 'Review Complete',
-    requires: ['technical-review', 'post-mortem-draft'], mode: 'all' })
+    requires: ['tech-review-complete', 'post-mortem-complete'], mode: 'all' })
 
   // Main states
   .addStep('detected',   { label: 'Detected' })
@@ -192,9 +200,9 @@ export const incidentWorkflow = createWorkflow({ name: 'it-incident-response' })
   .addTransition({ from: 'detected', to: 'triaged',            on: 'TRIAGE' })
   .addTransition({ from: 'triaged',  to: 'investigation-fork', on: 'START_INVESTIGATION' })
 
-  // Both investigation tracks must complete before the workflow can advance
-  .addTransition({ from: 'root-cause-analysis',  to: 'investigation-join', on: 'ROOT_CAUSE_FOUND' })
-  .addTransition({ from: 'stakeholders-notified', to: 'investigation-join', on: 'NOTIFY_STAKEHOLDERS' })
+  // Each investigation track dispatches its action → done state auto-completes
+  .addTransition({ from: 'root-cause-analysis',  to: 'root-cause-documented',  on: 'ROOT_CAUSE_FOUND' })
+  .addTransition({ from: 'stakeholders-notified', to: 'stakeholders-confirmed', on: 'NOTIFY_STAKEHOLDERS' })
 
   // After investigation: dismiss (false alarm) or move to containment
   .addTransition({ from: 'investigation-join', to: 'dismissed', on: 'DISMISS',
@@ -220,9 +228,9 @@ export const incidentWorkflow = createWorkflow({ name: 'it-incident-response' })
     ) })
 
   // Post-incident review runs technical and post-mortem tracks in parallel
-  .addTransition({ from: 'recovering',     to: 'review-fork',   on: 'START_REVIEW' })
-  .addTransition({ from: 'technical-review', to: 'review-join', on: 'COMPLETE_TECH_REVIEW' })
-  .addTransition({ from: 'post-mortem-draft', to: 'review-join', on: 'DRAFT_POST_MORTEM' })
+  .addTransition({ from: 'recovering',       to: 'review-fork',          on: 'START_REVIEW' })
+  .addTransition({ from: 'technical-review', to: 'tech-review-complete', on: 'COMPLETE_TECH_REVIEW' })
+  .addTransition({ from: 'post-mortem-draft', to: 'post-mortem-complete', on: 'DRAFT_POST_MORTEM' })
 
   // Closing requires incident-manager approval; data breaches need stakeholder-notified proof
   .addTransition({ from: 'review-join', to: 'resolved', on: 'CLOSE',

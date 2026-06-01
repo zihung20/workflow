@@ -209,7 +209,7 @@ export default function DesignerPage() {
             )}
 
             {selectedNode && (
-              <NodePanel node={selectedNode} workflow={workflow} onChange={handleNodeChange} onDelete={handleDeleteNode} />
+              <NodePanel node={selectedNode} onChange={handleNodeChange} onDelete={handleDeleteNode} />
             )}
             {selectedEdge && (
               <EdgePanel

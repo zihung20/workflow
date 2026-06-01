@@ -1,31 +1,33 @@
 /**
  * Example: Train Engineer Pre-Departure Checklist
  *
- * Demonstrates the Config-First WorkflowBuilder pattern. All state names are
- * declared upfront in the constructor so that `addFork` targets and `addJoin`
- * requires receive IDE autocomplete restricted to the declared union — no
- * manual type unions needed.
- *
  * Three inspection streams run in parallel (mechanical, electrical, safety),
- * then join before the engineer can sign off and depart.
+ * each requiring an explicit technician sign-off before the downstream join
+ * can activate. Demonstrates the two-state branch pattern:
+ *
+ *   fork activates "in-progress" states (mechanical, electrical, safety-systems).
+ *   Each technician dispatches their check action → transitions to a "done"
+ *   state (mech-cleared, etc.) which auto-completes immediately.
+ *   The join waits on the "done" states — it activates only after all three
+ *   explicit dispatches have been made.
  *
  * Workflow diagram:
  *
  *   reported-for-duty
  *        │ BRIEFING_RECEIVED
  *        ▼
- *   briefed ────────────── START_INSPECTION ──────────────▶ inspection-fork ⑂
- *                                                          /        |         \
- *                                               mechanical   electrical   safety-systems
- *                                                    │             │              │
- *                                            MECH_OK      ELEC_OK         SAFETY_OK
- *                                                    \             |              /
- *                                                     └────────────┴──────────────┘
- *                                                              join ⑁ (all)
- *                                                                │ SIGN_OFF
- *                                                         signed-off
- *                                                                │ DEPART
- *                                                           departed ✓
+ *   briefed ────START_INSPECTION────▶ inspection-fork ⑂
+ *                                    /        |          \
+ *                            mechanical   electrical   safety-systems
+ *                            │MECH_OK      │ELEC_OK      │SAFETY_OK
+ *                            ▼             ▼             ▼
+ *                       mech-cleared  elec-cleared  safety-cleared  (auto-complete)
+ *                            \             |             /
+ *                             ╘═══════ join ⑁ (all) ═══╛
+ *                                         │ SIGN_OFF
+ *                                    signed-off
+ *                                         │ DEPART
+ *                                    departed ✓
  *
  * Run with:  npx tsx examples/engineer-predeparture-checklist.ts
  */
@@ -49,23 +51,15 @@ const InspectionSchema = z.object({
 
 const SignOffSchema = z.object({
   engineerId: z.string(),
-  certifies: z.literal(true), // must explicitly assert readiness
+  certifies: z.literal(true),
 });
 
 const DepartSchema = z.object({
   platform: z.number().int().min(1),
-  scheduledAt: z.string(), // ISO 8601
+  scheduledAt: z.string(),
 });
 
-// ─── Workflow definition — Config-First pattern ───────────────────────────────
-//
-// All state IDs are declared upfront. TypeScript infers the union
-//   'reported-for-duty' | 'briefed' | 'inspection-fork' | 'mechanical' |
-//   'electrical' | 'safety-systems' | 'inspections-joined' | 'signed-off' | 'departed'
-// from the `states` array, so every subsequent call is constrained to that set.
-//
-// `addFork` and `addJoin` autocomplete their `targets`/`requires` arrays to
-// members of this union — no manual type annotations required.
+// ─── Workflow definition ──────────────────────────────────────────────────────
 
 const engineerChecklist = createWorkflow({
   name: 'engineer-predeparture-checklist',
@@ -81,42 +75,46 @@ const engineerChecklist = createWorkflow({
 
   // ── States ───────────────────────────────────────────────────────────────
   .addStep('reported-for-duty', { label: 'Reported for Duty' })
-  .addStep('briefed', { label: 'Briefed' })
+  .addStep('briefed',           { label: 'Briefed' })
 
-  // branches registered first so fork targets are in TStates at call time
-  .addStep('mechanical', { label: 'Mechanical Check' })
-  .addStep('electrical', { label: 'Electrical Check' })
+  // done states — auto-complete when entered; registered before the join that requires them
+  .addStep('mech-cleared',   { label: 'Mechanical Check Cleared' })
+  .addStep('elec-cleared',   { label: 'Electrical Check Cleared' })
+  .addStep('safety-cleared', { label: 'Safety Check Cleared' })
+  // in-progress states — fork targets; wait for an explicit technician dispatch
+  .addStep('mechanical',     { label: 'Mechanical Check' })
+  .addStep('electrical',     { label: 'Electrical Check' })
   .addStep('safety-systems', { label: 'Safety Systems Check' })
 
   .addFork('inspection-fork', {
     label: 'Inspection Fork',
     targets: ['mechanical', 'electrical', 'safety-systems'],
   })
-
-  // requires: autocompletes to the declared state union
   .addJoin('inspections-joined', {
     label: 'Inspections Complete',
-    requires: ['mechanical', 'electrical', 'safety-systems'],
+    requires: ['mech-cleared', 'elec-cleared', 'safety-cleared'],
     mode: 'all',
   })
 
   .addStep('signed-off', { label: 'Signed Off' })
-  .addStep('departed', { label: 'Departed' })
+  .addStep('departed',   { label: 'Departed' })
 
   // ── Graph ─────────────────────────────────────────────────────────────────
   .setInitial('reported-for-duty')
   .setTerminal(['departed'])
 
-  .addTransition({ from: 'reported-for-duty', to: 'briefed', on: 'BRIEFING_RECEIVED' })
-  .addTransition({ from: 'briefed', to: 'inspection-fork', on: 'START_INSPECTION' })
-  .addTransition({ from: 'mechanical', to: 'inspections-joined', on: 'MECH_OK' })
-  .addTransition({ from: 'electrical', to: 'inspections-joined', on: 'ELEC_OK' })
-  .addTransition({ from: 'safety-systems', to: 'inspections-joined', on: 'SAFETY_OK' })
+  .addTransition({ from: 'reported-for-duty', to: 'briefed',         on: 'BRIEFING_RECEIVED' })
+  .addTransition({ from: 'briefed',           to: 'inspection-fork', on: 'START_INSPECTION' })
+
+  // each technician dispatches their check; the done state auto-completes
+  .addTransition({ from: 'mechanical',     to: 'mech-cleared',   on: 'MECH_OK' })
+  .addTransition({ from: 'electrical',     to: 'elec-cleared',   on: 'ELEC_OK' })
+  .addTransition({ from: 'safety-systems', to: 'safety-cleared', on: 'SAFETY_OK' })
+
   .addTransition({
     from: 'inspections-joined',
     to: 'signed-off',
     on: 'SIGN_OFF',
-    // Guard: engineer must certify personally, not a stand-in
     guard: (ctx) => ctx.payload.certifies === true,
   })
   .addTransition({ from: 'signed-off', to: 'departed', on: 'DEPART' })
@@ -144,39 +142,25 @@ async function runChecklist() {
   });
   console.log(`[1] Briefing received — state: ${instance.getCurrentStates()}`);
 
-  // Step 2: Kick off parallel inspections
+  // Step 2: Kick off parallel inspections (fork activates 3 in-progress states)
   await instance.dispatch('START_INSPECTION', {});
   console.log(`[2] Inspections started — active: ${instance.getCurrentStates()}`);
-  // → 3 streams are now active simultaneously
 
-  // Step 3: Each technician clears their stream (order doesn't matter)
-  await instance.dispatch('ELEC_OK', {
-    technicianId: 'ELEC-7',
-    notes: 'All circuits nominal, no fault codes',
-  });
+  // Step 3–5: Each technician clears their stream (order doesn't matter)
+  await instance.dispatch('ELEC_OK', { technicianId: 'ELEC-7', notes: 'All circuits nominal' });
   console.log(`[3] Electrical cleared — active: ${instance.getCurrentStates()}`);
 
-  await instance.dispatch('SAFETY_OK', {
-    technicianId: 'SAFE-3',
-    notes: 'Emergency brakes, door interlocks, CCTV OK',
-  });
-  console.log(`[4] Safety systems cleared — active: ${instance.getCurrentStates()}`);
+  await instance.dispatch('SAFETY_OK', { technicianId: 'SAFE-3', notes: 'Emergency brakes OK' });
+  console.log(`[4] Safety cleared — active: ${instance.getCurrentStates()}`);
 
-  await instance.dispatch('MECH_OK', {
-    technicianId: 'MECH-12',
-    notes: 'Bogie, couplings, pantograph — all within spec',
-  });
-  console.log(`[5] Mechanical cleared — active: ${instance.getCurrentStates()}`);
-  // JoinState auto-activates once all three complete
+  await instance.dispatch('MECH_OK', { technicianId: 'MECH-12', notes: 'Bogie within spec' });
+  console.log(`[5] Mechanical cleared — all done states auto-completed → join active: ${instance.getCurrentStates()}`);
 
-  // Step 4: Engineer signs off
-  await instance.dispatch('SIGN_OFF', {
-    engineerId: 'ENG-042',
-    certifies: true,
-  });
+  // Step 6: Engineer signs off
+  await instance.dispatch('SIGN_OFF', { engineerId: 'ENG-042', certifies: true });
   console.log(`[6] Signed off — state: ${instance.getCurrentStates()}`);
 
-  // Step 5: Depart
+  // Step 7: Depart
   const departResult = await instance.dispatch('DEPART', {
     platform: 3,
     scheduledAt: '2024-05-20T06:00:00+08:00',
@@ -185,34 +169,25 @@ async function runChecklist() {
     console.log(`[7] Departed platform 3 ✓`);
     console.log(`\nWorkflow terminal: ${instance.isTerminal()}`);
     console.log(`History entries: ${instance.getSnapshot().history.length}`);
-    console.log(`Snapshot version: ${instance.getSnapshot().version}`);
   }
 
-  // ─── Demonstrate a guard block ───────────────────────────────────────────────
-  console.log('\n=== Guard demo: can a sign-off with certifies=false pass? ===\n');
+  // ─── Guard demo ──────────────────────────────────────────────────────────────
+  console.log('\n=== Guard demo: sign-off with certifies=false is rejected ===\n');
 
   const blocked = engineerChecklist.createInstance('ENG-099-demo');
-  await blocked.dispatch('BRIEFING_RECEIVED', {
-    trainId: 'ENG-099',
-    routeCode: 'EW2',
-    shiftTime: '14:00',
-  });
+  await blocked.dispatch('BRIEFING_RECEIVED', { trainId: 'ENG-099', routeCode: 'EW2', shiftTime: '14:00' });
   await blocked.dispatch('START_INSPECTION', {});
   await blocked.dispatch('MECH_OK', { technicianId: 'MECH-1' });
-  await blocked.dispatch('ELEC_OK', { technicianId: 'ELEC-1' });
+  await blocked.dispatch('ELEC_OK',  { technicianId: 'ELEC-1' });
   await blocked.dispatch('SAFETY_OK', { technicianId: 'SAFE-1' });
 
-  // Attempt to sign off with a falsified form (the Zod schema requires the literal `true`)
   try {
-    // prettier-ignore
     // @ts-expect-error — intentional: simulating a form submission without the checkbox ticked
     const guardResult = await blocked.dispatch('SIGN_OFF', { engineerId: 'ENG-099', certifies: false });
     if (!guardResult.success) {
       console.log(`Sign-off blocked: reason = "${guardResult.reason}"`);
-      console.log(`State unchanged: ${blocked.getCurrentStates()}`);
     }
   } catch (err: unknown) {
-    // Zod throws before the engine even sees it when `certifies` is not `true`
     console.log(`Zod validation rejected the payload: ${(err as Error).message.split('\n')[0]}`);
   }
 }

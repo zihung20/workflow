@@ -24,10 +24,13 @@
  *        │ AUTHORISE_RESPONSE  (guard: isDutyManager)
  *        ▼
  *   response-authorised ──▶ notification-fork ⑂
- *                            /          |         \
- *               ops-team*  stn-masters*  public-comms*   (* autoComplete — no action needed)
- *                            \          |         /
- *                         notification-join ⑁ (all, fires automatically when fork resolves)
+ *                            /          |          \
+ *                    ops-team    stn-masters    public-comms
+ *                 │NOTIFY_OPS  │NOTIFY_STN  │NOTIFY_PUBLIC
+ *                            ▼          ▼          ▼
+ *               ops-notified  stn-notified  public-notified  (auto-complete)
+ *                            \          |          /
+ *                         notification-join ⑁ (all, 3 confirmations required)
  *                                   │ START_BUS_BRIDGE  (guard: isDutyManager)
  *                                   ▼
  *                            bus-bridging ⤴  (WaitState: bus-bridging-sop)
@@ -87,17 +90,23 @@ const AuthoriseSchema = z.object({
 
 const StartNotificationsSchema = z.object({
   startedBy: z.object({ staffId: z.string(), role: z.string() }),
-  opsTeam: z.object({
-    channel: z.enum(['radio', 'phone', 'operations-system']),
-    confirmedAt: z.string(),
-  }),
-  stnMasters: z.object({
-    stationsCount: z.number().int().min(1),
-    method: z.enum(['PA', 'OCC-intercom', 'phone']),
-  }),
-  publicComms: z.object({
-    channelsUsed: z.array(z.enum(['twitter', 'lta-datamall', 'display-boards', 'announcement'])),
-  }),
+});
+
+const NotifyOpsSchema = z.object({
+  notifiedBy: z.object({ staffId: z.string(), role: z.string() }),
+  channel: z.enum(['radio', 'phone', 'operations-system']),
+  confirmedAt: z.string(),
+});
+
+const NotifyStnMastersSchema = z.object({
+  notifiedBy: z.object({ staffId: z.string(), role: z.string() }),
+  stationsCount: z.number().int().min(1),
+  method: z.enum(['PA', 'OCC-intercom', 'phone']),
+});
+
+const NotifyPublicSchema = z.object({
+  notifiedBy: z.object({ staffId: z.string(), role: z.string() }),
+  channelsUsed: z.array(z.enum(['twitter', 'lta-datamall', 'display-boards', 'announcement'])),
 });
 
 const BusBridgeSchema = z.object({
@@ -141,6 +150,9 @@ const occDisruptionSop = createWorkflow({
   .defineAction('ESCALATE_TO_DM', EscalateSchema)
   .defineAction('AUTHORISE_RESPONSE', AuthoriseSchema)
   .defineAction('START_NOTIFICATIONS', StartNotificationsSchema)
+  .defineAction('NOTIFY_OPS_TEAM', NotifyOpsSchema)
+  .defineAction('NOTIFY_STN_MASTERS', NotifyStnMastersSchema)
+  .defineAction('NOTIFY_PUBLIC', NotifyPublicSchema)
   .defineAction('START_BUS_BRIDGE', BusBridgeSchema)
   .defineAction('BUS_BRIDGE_ACTIVE', BusBridgeActiveSchema)
   .defineAction('SERVICE_RESTORED', ServiceRestoredSchema)
@@ -151,17 +163,21 @@ const occDisruptionSop = createWorkflow({
   .addStep('incident-verified', { label: 'Incident Verified' })
   .addStep('duty-manager-notified', { label: 'DM Notified' })
   .addStep('response-authorised', { label: 'Response Authorised' })
-  // branches registered first so fork targets are in TStates at call time
-  .addStep('ops-team', { label: 'Ops Team Notified' })
-  .addStep('stn-masters', { label: 'Station Masters Notified' })
-  .addStep('public-comms', { label: 'Public Notified' })
+  // done states — auto-complete when entered; join waits on these
+  .addStep('ops-notified',       { label: 'Ops Team Confirmed' })
+  .addStep('stn-notified',       { label: 'Station Masters Confirmed' })
+  .addStep('public-notified',    { label: 'Public Comms Confirmed' })
+  // in-progress states — fork targets; each requires an explicit dispatch
+  .addStep('ops-team',    { label: 'Notifying Ops Team' })
+  .addStep('stn-masters', { label: 'Notifying Station Masters' })
+  .addStep('public-comms', { label: 'Sending Public Comms' })
   .addFork('notification-fork', {
     label: 'Notification Fork',
     targets: ['ops-team', 'stn-masters', 'public-comms'],
   })
   .addJoin('notification-join', {
     label: 'All Parties Notified',
-    requires: ['ops-team', 'stn-masters', 'public-comms'],
+    requires: ['ops-notified', 'stn-notified', 'public-notified'],
     mode: 'all',
   })
   .addWait('bus-bridging', { label: 'Bus Bridging', externalName: 'bus-bridging-sop' })
@@ -195,6 +211,9 @@ const occDisruptionSop = createWorkflow({
     to: 'notification-fork',
     on: 'START_NOTIFICATIONS',
   })
+  .addTransition({ from: 'ops-team',     to: 'ops-notified',    on: 'NOTIFY_OPS_TEAM' })
+  .addTransition({ from: 'stn-masters',  to: 'stn-notified',    on: 'NOTIFY_STN_MASTERS' })
+  .addTransition({ from: 'public-comms', to: 'public-notified', on: 'NOTIFY_PUBLIC' })
   .addTransition({
     from: 'notification-join',
     to: 'bus-bridging',
@@ -277,28 +296,47 @@ async function runDisruptionSop() {
   });
   logStep('3. DM authorised response', inst.getCurrentStates());
 
-  // ── Step 4: Fork fans out to all three notification branches (autoComplete)
-  // The branches resolve immediately; the join activates in the same dispatch.
+  // ── Step 4: Fork fans out to all three notification branches ──────────────
   currentActor = ctrl;
   await inst.dispatch('START_NOTIFICATIONS', {
     startedBy: { staffId: ctrl.staffId, role: ctrl.role },
-    opsTeam: { channel: 'radio', confirmedAt: new Date().toISOString() },
-    stnMasters: { stationsCount: 5, method: 'OCC-intercom' },
-    publicComms: { channelsUsed: ['display-boards', 'announcement', 'twitter'] },
   });
-  logStep('4. Notifications sent → join active', inst.getCurrentStates());
+  logStep('4. Notification branches activated', inst.getCurrentStates());
 
-  // ── Step 5: DM authorises bus bridging wait state ───────────────────────────
+  // ── Step 5: Confirm ops team notified via radio ────────────────────────────
+  await inst.dispatch('NOTIFY_OPS_TEAM', {
+    notifiedBy: { staffId: ctrl.staffId, role: ctrl.role },
+    channel: 'radio',
+    confirmedAt: new Date().toISOString(),
+  });
+  logStep('5. Ops team notified', inst.getCurrentStates());
+
+  // ── Step 6: Confirm station masters notified ───────────────────────────────
+  await inst.dispatch('NOTIFY_STN_MASTERS', {
+    notifiedBy: { staffId: ctrl.staffId, role: ctrl.role },
+    stationsCount: 5,
+    method: 'OCC-intercom',
+  });
+  logStep('6. Station masters notified', inst.getCurrentStates());
+
+  // ── Step 7: Confirm public communications dispatched ──────────────────────
+  await inst.dispatch('NOTIFY_PUBLIC', {
+    notifiedBy: { staffId: ctrl.staffId, role: ctrl.role },
+    channelsUsed: ['display-boards', 'announcement', 'twitter'],
+  });
+  logStep('7. Public notified → all parties confirmed, join active', inst.getCurrentStates());
+
+  // ── Step 8: DM authorises bus bridging wait state ──────────────────────────
   currentActor = dm;
   const bbRef = `BB-${Date.now()}`;
   await inst.dispatch('START_BUS_BRIDGE', {
     authorisedBy: { staffId: dm.staffId, role: dm.role },
     busBridgeRef: bbRef,
   });
-  logStep('5. Bus bridging wait state entered', inst.getCurrentStates());
+  logStep('8. Bus bridging wait state entered', inst.getCurrentStates());
   // State is now 'waiting' — the parent SOP is paused
 
-  // ── Step 6: Bus-bridging SOP completes externally ───────────────────────────
+  // ── Step 9: Bus-bridging SOP completes externally ─────────────────────────
   // In production: bus-bridging-sop runs in a separate WorkflowInstance.
   // When it reaches terminal, the service calls resolveWait().
   console.log('\n  [external] Bus bridging SOP running...');
@@ -306,26 +344,26 @@ async function runDisruptionSop() {
 
   const fakeExternalSnap = occDisruptionSop.createInstance(bbRef).getSnapshot();
   inst.resolveWait('bus-bridging', fakeExternalSnap);
-  logStep('6. Wait state resolved', inst.getCurrentStates());
+  logStep('9. Wait state resolved', inst.getCurrentStates());
 
-  // ── Step 7: Confirm buses are active; advance past WaitState ─────────────────
+  // ── Step 10: Confirm buses are active; advance past WaitState ──────────────
   currentActor = ctrl;
   await inst.dispatch('BUS_BRIDGE_ACTIVE', {
     confirmedBy: { staffId: ctrl.staffId },
     busCount: 12,
     firstBusAt: new Date().toISOString(),
   });
-  logStep('7. Bus bridge active — disruption managed', inst.getCurrentStates());
+  logStep('10. Bus bridge active — disruption managed', inst.getCurrentStates());
 
-  // ── Step 8: Service restored after engineers fix the signal ─────────────────
+  // ── Step 11: Service restored after engineers fix the signal ───────────────
   await inst.dispatch('SERVICE_RESTORED', {
     confirmedBy: { staffId: ctrl.staffId, role: ctrl.role },
     restoredAt: new Date().toISOString(),
     remarks: 'Signal equipment replaced by P-Way team. Test runs completed.',
   });
-  logStep('8. Service restored', inst.getCurrentStates());
+  logStep('11. Service restored', inst.getCurrentStates());
 
-  // ── Step 9: Supervisor closes with post-incident report ────────────────────
+  // ── Step 12: Supervisor closes with post-incident report ───────────────────
   currentActor = supv;
   await inst.dispatch('FILE_REPORT', {
     filedBy: { staffId: supv.staffId, role: supv.role },
@@ -333,7 +371,7 @@ async function runDisruptionSop() {
     rootCause: 'Degraded signal relay at NS-18 — scheduled replacement overdue by 14 days',
     duration: 87,
   });
-  logStep('9. Report filed — incident closed', inst.getCurrentStates());
+  logStep('12. Report filed — incident closed', inst.getCurrentStates());
 
   // ── Summary ──────────────────────────────────────────────────────────────────
   const snap = inst.getSnapshot();

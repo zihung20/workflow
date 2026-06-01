@@ -5,11 +5,10 @@ import { Checkbox } from '../../components/ui/checkbox';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../components/ui/select';
-import type { DesignerNode, DesignerWorkflow, NodeKind } from '../types';
+import type { DesignerNode, NodeKind } from '../types';
 
 interface Props {
   node: DesignerNode;
-  workflow: DesignerWorkflow;
   onChange: (updated: DesignerNode) => void;
   onDelete: () => void;
 }
@@ -30,18 +29,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-export function NodePanel({ node, workflow, onChange, onDelete }: Props) {
-  const others = workflow.nodes.filter(n => n.id !== node.id);
-
+export function NodePanel({ node, onChange, onDelete }: Props) {
   function set<K extends keyof DesignerNode>(k: K, v: DesignerNode[K]) {
     onChange({ ...node, [k]: v });
-  }
-
-  function toggleRequire(id: string) {
-    set('joinRequires', node.joinRequires.includes(id)
-      ? node.joinRequires.filter(r => r !== id)
-      : [...node.joinRequires, id],
-    );
   }
 
   return (
@@ -95,23 +85,6 @@ export function NodePanel({ node, workflow, onChange, onDelete }: Props) {
 
       {node.kind === 'join' && (
         <>
-          <Field label="Requires">
-            <div className="space-y-1.5 max-h-28 overflow-y-auto rounded-md border border-input bg-background p-2">
-              {others.length === 0
-                ? <p className="text-xs text-muted-foreground italic">Add other states first</p>
-                : others.map(n => (
-                  <label key={n.id} className="flex items-center gap-2 cursor-pointer select-none text-xs text-foreground">
-                    <Checkbox
-                      checked={node.joinRequires.includes(n.id)}
-                      onCheckedChange={() => toggleRequire(n.id)}
-                    />
-                    <span className="font-mono">{n.id}</span>
-                  </label>
-                ))
-              }
-            </div>
-          </Field>
-
           <Field label="Synchronisation mode">
             <Select
               value={typeof node.joinMode === 'number' ? 'quorum' : node.joinMode}

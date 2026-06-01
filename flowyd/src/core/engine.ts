@@ -204,7 +204,10 @@ export class WorkflowEngine {
 
   /**
    * Applies the entry behaviour for a state based on its kind:
-   * - `StepState` → `active`
+   * - `StepState` → `active`; or `completed` immediately when the state has no
+   *   outgoing transitions and is not terminal (dead-end marker — auto-completes
+   *   so that a downstream `JoinState` can activate via its `requires` list
+   *   without requiring an additional dispatch)
    * - `ForkState` → `completed` (transient), then recursively enters all targets
    * - `JoinState` → deferred; handled by the fixed-point join-check loop
    * - `WaitState` → `waiting`
@@ -221,16 +224,20 @@ export class WorkflowEngine {
     }
 
     switch (state.kind) {
-      case StateKind.Step:
-        statuses.set(stateId, StateStatus.Active);
+      case StateKind.Step: {
+        const isDeadEnd = !definition.transitions.some((t) => t.from === stateId)
+          && !definition.terminalStateIds.includes(stateId);
+        statuses.set(stateId, isDeadEnd ? StateStatus.Completed : StateStatus.Active);
         entered.push(stateId);
         break;
+      }
 
       case StateKind.Fork: {
         // ForkState is transient — complete it immediately and fan out to targets.
         statuses.set(stateId, StateStatus.Completed);
         for (const target of state.targets) {
-          WorkflowEngine.enterForkTarget(target as TStates, definition, statuses, entered);
+          // Cast is safe: ForkState.targets are validated at build() to be registered TStates IDs.
+          WorkflowEngine.enterState(target as TStates, definition, statuses, entered);
         }
         break;
       }
@@ -244,33 +251,6 @@ export class WorkflowEngine {
         statuses.set(stateId, StateStatus.Waiting);
         entered.push(stateId);
         break;
-    }
-  }
-
-  /**
-   * Enters a single fork target, applying auto-complete for step states that
-   * have no outgoing transitions. Such steps have no work to do — completing
-   * them immediately lets a downstream `JoinState` activate via its `requires`
-   * list without requiring any explicit dispatch.
-   *
-   * @param target     - The target state ID to enter.
-   * @param definition - The immutable compiled workflow graph.
-   * @param statuses   - Mutable status map being built for this evaluation cycle.
-   * @param entered    - Accumulator of state IDs entered during this cycle.
-   */
-  private static enterForkTarget<TStates extends string>(
-    target: TStates,
-    definition: WorkflowDefinition<unknown, TStates>,
-    statuses: MutableStatusMap<TStates>,
-    entered: TStates[],
-  ): void {
-    const targetState = definition.states.get(target);
-    const hasOutgoing = definition.transitions.some((t) => t.from === target);
-    if (targetState?.kind === StateKind.Step && !hasOutgoing) {
-      statuses.set(target, StateStatus.Completed);
-      entered.push(target);
-    } else {
-      WorkflowEngine.enterState(target, definition, statuses, entered);
     }
   }
 

@@ -1,5 +1,5 @@
 export type NodeKind = 'step' | 'fork' | 'join' | 'wait';
-export type EdgeKind = 'transition' | 'fork-target';
+export type EdgeKind = 'transition' | 'fork-target' | 'join-requires';
 
 export interface DesignerNode {
   id: string;
@@ -8,7 +8,6 @@ export interface DesignerNode {
   isInitial: boolean;
   isTerminal: boolean;
   forkTargets: string[];
-  joinRequires: string[];
   joinMode: 'all' | 'any' | number;
   waitExternalName: string;
 }

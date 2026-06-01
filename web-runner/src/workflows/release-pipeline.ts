@@ -4,20 +4,22 @@ import { createWorkflow, Guard } from 'flowyd';
 /**
  * Multi-environment production release pipeline for a microservices platform.
  *
- * Demonstrates: setContext, 50-state TStates union, 8 parallel fork/join phases,
- * WaitState observation period, inline payload guards, context-aware Guard.fn,
+ * Demonstrates: setContext, 8 parallel fork/join phases with two-state branch
+ * pattern (in-progress state → done state that auto-completes), WaitState
+ * observation period, inline payload guards, context-aware Guard.fn,
  * Guard.and / Guard.inject combinators, and ReturnType instance typing.
  *
  * Flow:
  *   draft
- *     → [pre-checks ×5: change-ticket | design | security | dep-audit | license]
- *     → [builds ×4: api | frontend | worker | infra]
- *     → [tests ×4: unit | integration | e2e | load]
+ *     → [pre-checks ×5] → [builds ×4] → [tests ×4]
  *     → [staging-deploy ×3] → [staging-validation ×3] → qa-sign-off
- *     → [approvals ×3: engineering | security | product]
- *     → [prod-deploy ×3: eu | us | apac] → [prod-validation ×3]
- *     → observation (WaitState — resolveWait('monitoring-system') + CONFIRM_RELEASE)
- *     → released ✓
+ *     → [approvals ×3]
+ *     → [prod-deploy ×3] → [prod-validation ×3]
+ *     → observation (WaitState) → released ✓
+ *
+ * Each parallel branch follows the two-state pattern:
+ *   fork activates "in-progress" state → dispatch action → "done" state auto-completes
+ *   join requires the "done" states, not the in-progress ones.
  */
 
 // ── Release context ────────────────────────────────────────────────────────────
@@ -113,7 +115,6 @@ const CancellationSchema = z.object({
 
 // ── Reusable guards ────────────────────────────────────────────────────────────
 
-// Score threshold varies by release type: major needs 90+, all others 75+.
 const securityScoreGuard = Guard.fn<
   z.infer<typeof SecurityReviewSchema>,
   z.infer<typeof ReleaseContextSchema>
@@ -122,19 +123,16 @@ const securityScoreGuard = Guard.fn<
   return ctx.payload.score >= threshold && ctx.payload.criticalCount === 0;
 });
 
-// Infra destroys are blocked on non-emergency releases — too risky to automate.
 const infraDestroyGuard = Guard.fn<
   z.infer<typeof InfraPlanSchema>,
   z.infer<typeof ReleaseContextSchema>
 >((ctx) => ctx.context.isEmergency || ctx.payload.destroyCount === 0);
 
-// Security approval requires director sign-off AND the assessed risk must not be 'high'.
 const securityApprovalGuard = Guard.and([
   Guard.inject('security-director'),
   Guard.fn<z.infer<typeof RiskApprovalSchema>>((ctx) => ctx.payload.riskLevel !== 'high'),
 ]);
 
-// Final confirmation requires CTO sign-off AND fewer than 5 alerts during observation.
 const releaseConfirmGuard = Guard.and([
   Guard.inject('cto'),
   Guard.fn<z.infer<typeof ObservationSchema>>((ctx) => ctx.payload.alertsFired < 5),
@@ -189,14 +187,20 @@ export const releasePipelineWorkflow = createWorkflow({ name: 'release-pipeline'
   .defineAction('ROLLBACK',                 CancellationSchema)
 
   // ── States ───────────────────────────────────────────────────────────────────
-
   // Spine
   .addStep('draft',       { label: 'Draft' })
   .addStep('released',    { label: 'Released' })
   .addStep('rolled-back', { label: 'Rolled Back' })
   .addStep('cancelled',   { label: 'Cancelled' })
 
-  // Phase 1 — pre-checks (branches must precede their fork)
+  // Phase 1 — pre-checks
+  // done states (auto-complete; registered before join)
+  .addStep('change-ticket-ok', { label: 'Change Ticket Approved' })
+  .addStep('design-ok',        { label: 'Design Approved' })
+  .addStep('security-ok',      { label: 'Security Review Approved' })
+  .addStep('dep-audit-ok',     { label: 'Dependency Audit Passed' })
+  .addStep('license-ok',       { label: 'License Scan Passed' })
+  // in-progress states (fork targets)
   .addStep('change-ticket-review', { label: 'Change Ticket Review' })
   .addStep('design-review',        { label: 'Design Review' })
   .addStep('security-review',      { label: 'Security Review' })
@@ -205,9 +209,15 @@ export const releasePipelineWorkflow = createWorkflow({ name: 'release-pipeline'
   .addFork('pre-checks-fork', { label: 'Pre-checks Fork',
     targets: ['change-ticket-review', 'design-review', 'security-review', 'dependency-audit', 'license-scan'] })
   .addJoin('pre-checks-join', { label: 'Pre-checks Complete',
-    requires: ['change-ticket-review', 'design-review', 'security-review', 'dependency-audit', 'license-scan'], mode: 'all' })
+    requires: ['change-ticket-ok', 'design-ok', 'security-ok', 'dep-audit-ok', 'license-ok'], mode: 'all' })
 
   // Phase 2 — builds
+  // done states
+  .addStep('api-built',      { label: 'API Built' })
+  .addStep('frontend-built', { label: 'Frontend Built' })
+  .addStep('worker-built',   { label: 'Worker Built' })
+  .addStep('infra-planned',  { label: 'Infra Planned' })
+  // in-progress states
   .addStep('api-build',      { label: 'API Build' })
   .addStep('frontend-build', { label: 'Frontend Build' })
   .addStep('worker-build',   { label: 'Worker Build' })
@@ -215,9 +225,15 @@ export const releasePipelineWorkflow = createWorkflow({ name: 'release-pipeline'
   .addFork('builds-fork', { label: 'Builds Fork',
     targets: ['api-build', 'frontend-build', 'worker-build', 'infra-plan'] })
   .addJoin('builds-join', { label: 'Builds Complete',
-    requires: ['api-build', 'frontend-build', 'worker-build', 'infra-plan'], mode: 'all' })
+    requires: ['api-built', 'frontend-built', 'worker-built', 'infra-planned'], mode: 'all' })
 
   // Phase 3 — tests
+  // done states
+  .addStep('unit-tests-ok',        { label: 'Unit Tests Passed' })
+  .addStep('integration-tests-ok', { label: 'Integration Tests Passed' })
+  .addStep('e2e-tests-ok',         { label: 'E2E Tests Passed' })
+  .addStep('load-tests-ok',        { label: 'Load Tests Passed' })
+  // in-progress states
   .addStep('unit-tests',        { label: 'Unit Tests' })
   .addStep('integration-tests', { label: 'Integration Tests' })
   .addStep('e2e-tests',         { label: 'E2E Tests' })
@@ -225,55 +241,80 @@ export const releasePipelineWorkflow = createWorkflow({ name: 'release-pipeline'
   .addFork('tests-fork', { label: 'Tests Fork',
     targets: ['unit-tests', 'integration-tests', 'e2e-tests', 'load-tests'] })
   .addJoin('tests-join', { label: 'Tests Complete',
-    requires: ['unit-tests', 'integration-tests', 'e2e-tests', 'load-tests'], mode: 'all' })
+    requires: ['unit-tests-ok', 'integration-tests-ok', 'e2e-tests-ok', 'load-tests-ok'], mode: 'all' })
 
   // Phase 4 — staging deploy
-  .addStep('staging-api',      { label: 'Staging API' })
-  .addStep('staging-frontend', { label: 'Staging Frontend' })
-  .addStep('staging-worker',   { label: 'Staging Worker' })
+  // done states
+  .addStep('staging-api-up',      { label: 'Staging API Up' })
+  .addStep('staging-frontend-up', { label: 'Staging Frontend Up' })
+  .addStep('staging-worker-up',   { label: 'Staging Worker Up' })
+  // in-progress states
+  .addStep('staging-api',      { label: 'Staging API Deploy' })
+  .addStep('staging-frontend', { label: 'Staging Frontend Deploy' })
+  .addStep('staging-worker',   { label: 'Staging Worker Deploy' })
   .addFork('staging-deploy-fork', { label: 'Staging Deploy Fork',
     targets: ['staging-api', 'staging-frontend', 'staging-worker'] })
   .addJoin('staging-deploy-join', { label: 'Staging Deploy Complete',
-    requires: ['staging-api', 'staging-frontend', 'staging-worker'], mode: 'all' })
+    requires: ['staging-api-up', 'staging-frontend-up', 'staging-worker-up'], mode: 'all' })
 
   // Phase 5 — staging validation
+  // done states
+  .addStep('staging-smoke-ok',       { label: 'Staging Smoke Cleared' })
+  .addStep('staging-regression-ok',  { label: 'Staging Regression Cleared' })
+  .addStep('staging-performance-ok', { label: 'Staging Performance Cleared' })
+  // in-progress states
   .addStep('staging-smoke',       { label: 'Staging Smoke Tests' })
   .addStep('staging-regression',  { label: 'Staging Regression Tests' })
   .addStep('staging-performance', { label: 'Staging Performance Tests' })
   .addFork('staging-validation-fork', { label: 'Staging Validation Fork',
     targets: ['staging-smoke', 'staging-regression', 'staging-performance'] })
   .addJoin('staging-validation-join', { label: 'Staging Validation Complete',
-    requires: ['staging-smoke', 'staging-regression', 'staging-performance'], mode: 'all' })
+    requires: ['staging-smoke-ok', 'staging-regression-ok', 'staging-performance-ok'], mode: 'all' })
 
   // Phase 6 — QA gate + approvals
-  .addStep('qa-sign-off',          { label: 'QA Sign-off' })
+  .addStep('qa-sign-off', { label: 'QA Sign-off' })
+  // done states
+  .addStep('engineering-approved', { label: 'Engineering Approved' })
+  .addStep('security-approved',    { label: 'Security Approved' })
+  .addStep('product-approved',     { label: 'Product Approved' })
+  // in-progress states
   .addStep('engineering-approval', { label: 'Engineering Approval' })
   .addStep('security-approval',    { label: 'Security Approval' })
   .addStep('product-approval',     { label: 'Product Approval' })
   .addFork('approvals-fork', { label: 'Approvals Fork',
     targets: ['engineering-approval', 'security-approval', 'product-approval'] })
   .addJoin('approvals-join', { label: 'All Approvals Received',
-    requires: ['engineering-approval', 'security-approval', 'product-approval'], mode: 'all' })
+    requires: ['engineering-approved', 'security-approved', 'product-approved'], mode: 'all' })
 
   // Phase 7 — production deploy (multi-region)
+  // done states
+  .addStep('prod-eu-up',   { label: 'Prod EU Up' })
+  .addStep('prod-us-up',   { label: 'Prod US Up' })
+  .addStep('prod-apac-up', { label: 'Prod APAC Up' })
+  // in-progress states
   .addStep('prod-eu',   { label: 'Prod EU Deploy' })
   .addStep('prod-us',   { label: 'Prod US Deploy' })
   .addStep('prod-apac', { label: 'Prod APAC Deploy' })
   .addFork('prod-deploy-fork', { label: 'Prod Deploy Fork',
     targets: ['prod-eu', 'prod-us', 'prod-apac'] })
   .addJoin('prod-deploy-join', { label: 'Prod Deploy Complete',
-    requires: ['prod-eu', 'prod-us', 'prod-apac'], mode: 'all' })
+    requires: ['prod-eu-up', 'prod-us-up', 'prod-apac-up'], mode: 'all' })
 
   // Phase 8 — production validation
+  // done states
+  .addStep('prod-eu-smoke-ok',   { label: 'Prod EU Smoke Cleared' })
+  .addStep('prod-us-smoke-ok',   { label: 'Prod US Smoke Cleared' })
+  .addStep('prod-apac-smoke-ok', { label: 'Prod APAC Smoke Cleared' })
+  // in-progress states
   .addStep('prod-eu-smoke',   { label: 'Prod EU Smoke' })
   .addStep('prod-us-smoke',   { label: 'Prod US Smoke' })
   .addStep('prod-apac-smoke', { label: 'Prod APAC Smoke' })
   .addFork('prod-validation-fork', { label: 'Prod Validation Fork',
     targets: ['prod-eu-smoke', 'prod-us-smoke', 'prod-apac-smoke'] })
   .addJoin('prod-validation-join', { label: 'Prod Validation Complete',
-    requires: ['prod-eu-smoke', 'prod-us-smoke', 'prod-apac-smoke'], mode: 'all' })
+    requires: ['prod-eu-smoke-ok', 'prod-us-smoke-ok', 'prod-apac-smoke-ok'], mode: 'all' })
 
-  // Phase 9 — observation (external monitoring resolves this, then service dispatches CONFIRM_RELEASE)
+  // Phase 9 — observation
   .addWait('observation', { label: 'Observation Period', externalName: 'monitoring-system' })
 
   .setInitial('draft')
@@ -283,76 +324,79 @@ export const releasePipelineWorkflow = createWorkflow({ name: 'release-pipeline'
 
   .addTransition({ from: 'draft', to: 'pre-checks-fork', on: 'SUBMIT' })
 
-  // Pre-checks — each branch has its own completion guard
-  .addTransition({ from: 'change-ticket-review', to: 'pre-checks-join', on: 'APPROVE_CHANGE_TICKET' })
-  .addTransition({ from: 'design-review',        to: 'pre-checks-join', on: 'APPROVE_DESIGN' })
-  .addTransition({ from: 'security-review',      to: 'pre-checks-join', on: 'APPROVE_SECURITY_REVIEW',
+  // Phase 1 — pre-checks (each branch → done state which auto-completes)
+  .addTransition({ from: 'change-ticket-review', to: 'change-ticket-ok', on: 'APPROVE_CHANGE_TICKET' })
+  .addTransition({ from: 'design-review',        to: 'design-ok',        on: 'APPROVE_DESIGN' })
+  .addTransition({ from: 'security-review',      to: 'security-ok',      on: 'APPROVE_SECURITY_REVIEW',
     guard: securityScoreGuard })
-  .addTransition({ from: 'dependency-audit',     to: 'pre-checks-join', on: 'COMPLETE_DEP_AUDIT',
+  .addTransition({ from: 'dependency-audit',     to: 'dep-audit-ok',     on: 'COMPLETE_DEP_AUDIT',
     guard: (ctx) => ctx.payload.criticalCount === 0 })
-  .addTransition({ from: 'license-scan',         to: 'pre-checks-join', on: 'COMPLETE_LICENSE_SCAN',
+  .addTransition({ from: 'license-scan',         to: 'license-ok',       on: 'COMPLETE_LICENSE_SCAN',
     guard: (ctx) => ctx.payload.blockerCount === 0 })
 
   .addTransition({ from: 'pre-checks-join', to: 'builds-fork', on: 'START_BUILDS' })
 
-  // Builds — infra destroys are blocked on non-emergency releases
-  .addTransition({ from: 'api-build',      to: 'builds-join', on: 'BUILD_API_DONE' })
-  .addTransition({ from: 'frontend-build', to: 'builds-join', on: 'BUILD_FRONTEND_DONE' })
-  .addTransition({ from: 'worker-build',   to: 'builds-join', on: 'BUILD_WORKER_DONE' })
-  .addTransition({ from: 'infra-plan',     to: 'builds-join', on: 'PLAN_INFRA_DONE',
+  // Phase 2 — builds
+  .addTransition({ from: 'api-build',      to: 'api-built',      on: 'BUILD_API_DONE' })
+  .addTransition({ from: 'frontend-build', to: 'frontend-built', on: 'BUILD_FRONTEND_DONE' })
+  .addTransition({ from: 'worker-build',   to: 'worker-built',   on: 'BUILD_WORKER_DONE' })
+  .addTransition({ from: 'infra-plan',     to: 'infra-planned',  on: 'PLAN_INFRA_DONE',
     guard: infraDestroyGuard })
 
   .addTransition({ from: 'builds-join', to: 'tests-fork', on: 'START_TESTS' })
 
-  // Tests — zero failures required; load tests enforce latency and error-rate SLOs
-  .addTransition({ from: 'unit-tests',        to: 'tests-join', on: 'UNIT_TESTS_PASSED',
+  // Phase 3 — tests
+  .addTransition({ from: 'unit-tests',        to: 'unit-tests-ok',        on: 'UNIT_TESTS_PASSED',
     guard: (ctx) => ctx.payload.failed === 0 })
-  .addTransition({ from: 'integration-tests', to: 'tests-join', on: 'INTEGRATION_TESTS_PASSED',
+  .addTransition({ from: 'integration-tests', to: 'integration-tests-ok', on: 'INTEGRATION_TESTS_PASSED',
     guard: (ctx) => ctx.payload.failed === 0 })
-  .addTransition({ from: 'e2e-tests',         to: 'tests-join', on: 'E2E_TESTS_PASSED',
+  .addTransition({ from: 'e2e-tests',         to: 'e2e-tests-ok',         on: 'E2E_TESTS_PASSED',
     guard: (ctx) => ctx.payload.failed === 0 })
-  .addTransition({ from: 'load-tests',        to: 'tests-join', on: 'LOAD_TESTS_PASSED',
+  .addTransition({ from: 'load-tests',        to: 'load-tests-ok',        on: 'LOAD_TESTS_PASSED',
     guard: (ctx) => ctx.payload.p99Ms < 200 && ctx.payload.p999Ms < 800 && ctx.payload.errorRate < 0.01 })
 
   .addTransition({ from: 'tests-join', to: 'staging-deploy-fork', on: 'DEPLOY_TO_STAGING' })
 
-  .addTransition({ from: 'staging-api',      to: 'staging-deploy-join', on: 'STAGING_API_UP' })
-  .addTransition({ from: 'staging-frontend', to: 'staging-deploy-join', on: 'STAGING_FRONTEND_UP' })
-  .addTransition({ from: 'staging-worker',   to: 'staging-deploy-join', on: 'STAGING_WORKER_UP' })
+  // Phase 4 — staging deploy
+  .addTransition({ from: 'staging-api',      to: 'staging-api-up',      on: 'STAGING_API_UP' })
+  .addTransition({ from: 'staging-frontend', to: 'staging-frontend-up', on: 'STAGING_FRONTEND_UP' })
+  .addTransition({ from: 'staging-worker',   to: 'staging-worker-up',   on: 'STAGING_WORKER_UP' })
 
   .addTransition({ from: 'staging-deploy-join', to: 'staging-validation-fork', on: 'START_STAGING_VALIDATION' })
 
-  // Staging validation — perf must not regress more than 15% against baseline
-  .addTransition({ from: 'staging-smoke',       to: 'staging-validation-join', on: 'STAGING_SMOKE_OK' })
-  .addTransition({ from: 'staging-regression',  to: 'staging-validation-join', on: 'STAGING_REGRESSION_OK',
+  // Phase 5 — staging validation
+  .addTransition({ from: 'staging-smoke',       to: 'staging-smoke-ok',       on: 'STAGING_SMOKE_OK' })
+  .addTransition({ from: 'staging-regression',  to: 'staging-regression-ok',  on: 'STAGING_REGRESSION_OK',
     guard: (ctx) => ctx.payload.failed === 0 })
-  .addTransition({ from: 'staging-performance', to: 'staging-validation-join', on: 'STAGING_PERFORMANCE_OK',
+  .addTransition({ from: 'staging-performance', to: 'staging-performance-ok', on: 'STAGING_PERFORMANCE_OK',
     guard: (ctx) => ctx.payload.p99Ms < 200 && ctx.payload.baselineRatio < 1.15 })
 
   // QA gate — injected qa-lead must approve before approvals phase opens
-  .addTransition({ from: 'staging-validation-join', to: 'qa-sign-off',     on: 'QA_SIGN_OFF',
+  .addTransition({ from: 'staging-validation-join', to: 'qa-sign-off',    on: 'QA_SIGN_OFF',
     guard: Guard.inject('qa-lead') })
-  .addTransition({ from: 'qa-sign-off',             to: 'approvals-fork',  on: 'START_APPROVALS' })
+  .addTransition({ from: 'qa-sign-off',             to: 'approvals-fork', on: 'START_APPROVALS' })
 
-  // Approvals — security uses Guard.and (director + risk level check)
-  .addTransition({ from: 'engineering-approval', to: 'approvals-join', on: 'ENGINEERING_APPROVED',
+  // Phase 6 — approvals
+  .addTransition({ from: 'engineering-approval', to: 'engineering-approved', on: 'ENGINEERING_APPROVED',
     guard: Guard.inject('engineering-director') })
-  .addTransition({ from: 'security-approval',    to: 'approvals-join', on: 'SECURITY_APPROVED',
+  .addTransition({ from: 'security-approval',    to: 'security-approved',    on: 'SECURITY_APPROVED',
     guard: securityApprovalGuard })
-  .addTransition({ from: 'product-approval',     to: 'approvals-join', on: 'PRODUCT_APPROVED',
+  .addTransition({ from: 'product-approval',     to: 'product-approved',     on: 'PRODUCT_APPROVED',
     guard: Guard.inject('product-director') })
 
   .addTransition({ from: 'approvals-join', to: 'prod-deploy-fork', on: 'BEGIN_PROD_ROLLOUT' })
 
-  .addTransition({ from: 'prod-eu',   to: 'prod-deploy-join', on: 'PROD_EU_DEPLOYED' })
-  .addTransition({ from: 'prod-us',   to: 'prod-deploy-join', on: 'PROD_US_DEPLOYED' })
-  .addTransition({ from: 'prod-apac', to: 'prod-deploy-join', on: 'PROD_APAC_DEPLOYED' })
+  // Phase 7 — prod deploy
+  .addTransition({ from: 'prod-eu',   to: 'prod-eu-up',   on: 'PROD_EU_DEPLOYED' })
+  .addTransition({ from: 'prod-us',   to: 'prod-us-up',   on: 'PROD_US_DEPLOYED' })
+  .addTransition({ from: 'prod-apac', to: 'prod-apac-up', on: 'PROD_APAC_DEPLOYED' })
 
   .addTransition({ from: 'prod-deploy-join', to: 'prod-validation-fork', on: 'START_PROD_VALIDATION' })
 
-  .addTransition({ from: 'prod-eu-smoke',   to: 'prod-validation-join', on: 'PROD_EU_SMOKE_OK' })
-  .addTransition({ from: 'prod-us-smoke',   to: 'prod-validation-join', on: 'PROD_US_SMOKE_OK' })
-  .addTransition({ from: 'prod-apac-smoke', to: 'prod-validation-join', on: 'PROD_APAC_SMOKE_OK' })
+  // Phase 8 — prod validation
+  .addTransition({ from: 'prod-eu-smoke',   to: 'prod-eu-smoke-ok',   on: 'PROD_EU_SMOKE_OK' })
+  .addTransition({ from: 'prod-us-smoke',   to: 'prod-us-smoke-ok',   on: 'PROD_US_SMOKE_OK' })
+  .addTransition({ from: 'prod-apac-smoke', to: 'prod-apac-smoke-ok', on: 'PROD_APAC_SMOKE_OK' })
 
   // Observation — after resolveWait('monitoring-system'), dispatch CONFIRM_RELEASE
   .addTransition({ from: 'prod-validation-join', to: 'observation', on: 'BEGIN_OBSERVATION' })
@@ -366,9 +410,9 @@ export const releasePipelineWorkflow = createWorkflow({ name: 'release-pipeline'
   .addTransition({ from: 'observation',             to: 'rolled-back', on: 'ROLLBACK' })
 
   // Cancel — available from early phases before staging
-  .addTransition({ from: 'draft',          to: 'cancelled', on: 'CANCEL' })
+  .addTransition({ from: 'draft',           to: 'cancelled', on: 'CANCEL' })
   .addTransition({ from: 'pre-checks-join', to: 'cancelled', on: 'CANCEL' })
-  .addTransition({ from: 'builds-join',    to: 'cancelled', on: 'CANCEL' })
+  .addTransition({ from: 'builds-join',     to: 'cancelled', on: 'CANCEL' })
 
   .build();
 
