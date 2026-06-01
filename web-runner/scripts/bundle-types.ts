@@ -7,7 +7,7 @@
  * them with public names (`export { S as StateKind } from './chunk'`).
  * The bundle emits only the public names from the entry file.
  */
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -128,6 +128,8 @@ function bundle(pkgDir: string, entryFile: string, moduleName: string): string {
 }
 
 const root = resolve(__dirname, '..');
+
+mkdirSync(resolve(root, 'src/types'), { recursive: true });
 
 // ── zod ─────────────────────────────────────────────────────────────────────
 const zodOut = bundle(resolve(root, 'node_modules/zod/v3'), 'external.d.ts', 'zod');
