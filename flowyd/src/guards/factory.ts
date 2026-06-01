@@ -4,7 +4,8 @@ import { OrGuard } from './or-guard.js';
 import { NotGuard } from './not-guard.js';
 import { InjectedGuard } from './inject-guard.js';
 import { StateCompletedGuard, StateActiveGuard } from './state-guard.js';
-import { AlwaysGuard, NeverGuard, FnGuard } from './primitives.js';
+import { AlwaysGuard, NeverGuard } from './constant-guards.js';
+import { FnGuard } from './fn-guard.js';
 
 /**
  * Factory namespace for constructing and composing guards.

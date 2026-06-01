@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { AndGuard } from './and-guard.js';
-import { AlwaysGuard, NeverGuard } from './primitives.js';
+import { AlwaysGuard, NeverGuard } from './constant-guards.js';
 import { makeCtx } from '../../tests/helpers.js';
 
 describe('AndGuard', () => {

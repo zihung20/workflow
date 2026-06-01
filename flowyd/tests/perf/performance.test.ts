@@ -47,7 +47,7 @@ function buildWideHub(transitionCount: number) {
     builder.addTransition({ from: 'hub', to: target, on: `ACTION_${i}` });
     terminals.push(target);
   }
-  builder.setInitial('hub').setTerminal(terminals as [string, ...string[]]);
+  builder.setInitial('hub').setTerminal(terminals);
   return builder.build();
 }
 

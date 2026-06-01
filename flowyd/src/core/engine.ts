@@ -101,7 +101,7 @@ export class WorkflowEngine {
       // Cast is safe: IGuard.evaluate is the type-erased guard boundary;
       // FnGuard re-narrows to the concrete payload/context/state types via its own cast.
       const allowed = candidate.guard
-        ? await candidate.guard.evaluate(guardCtx as GuardContext<unknown>)
+        ? await candidate.guard.evaluate(guardCtx)
         : true;
       if (allowed) {
         passing.push(candidate);

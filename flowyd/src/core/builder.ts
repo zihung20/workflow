@@ -144,7 +144,7 @@ export class WorkflowBuilder<
     schema: ZodSchema<T>,
   ): WorkflowBuilder<TActions & Record<K, T>, TStates, TContext> {
     this.actionSchemas.set(name, schema);
-    return this as WorkflowBuilder<TActions & Record<K, T>, TStates, TContext>;
+    return this;
   }
 
   /**

@@ -1,6 +1,6 @@
 {
   "name": "flowyd",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A TypeScript library for defining, executing, and visualizing logic workflows",
   "homepage": "https://zihung20.github.io/flowyd/",
   "repository": {
@@ -9,23 +9,33 @@
   },
   "license": "MIT",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/index.cjs",
+  "types": "./dist/index.d.cts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     },
     "./visualization": {
-      "types": "./dist/visualization/index.d.ts",
-      "import": "./dist/visualization/index.js",
-      "require": "./dist/visualization/index.cjs"
+      "import": {
+        "types": "./dist/visualization/index.d.mts",
+        "default": "./dist/visualization/index.mjs"
+      },
+      "require": {
+        "types": "./dist/visualization/index.d.cts",
+        "default": "./dist/visualization/index.cjs"
+      }
     }
   },
   "scripts": {
-    "build": "tsup",
-    "dev": "tsup --watch",
+    "build": "tsdown",
+    "dev": "tsdown --watch",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
@@ -51,15 +61,15 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "zod": "^3.23.8",
     "@types/node": "^24.0.0",
-    "@typescript-eslint/eslint-plugin": "^7.13.0",
-    "@typescript-eslint/parser": "^7.13.0",
+    "@typescript-eslint/eslint-plugin": "^8.60.0",
+    "@typescript-eslint/parser": "^8.60.0",
     "eslint": "^8.57.0",
     "prettier": "^3.8.3",
-    "tsup": "^8.1.0",
-    "typescript": "^5.5.2",
+    "tsdown": "^0.22.1",
+    "typescript": "^6.0.3",
     "vitepress": "^1.6.4",
-    "vitest": "^1.6.0"
+    "vitest": "^1.6.0",
+    "zod": "^3.23.8"
   }
 }

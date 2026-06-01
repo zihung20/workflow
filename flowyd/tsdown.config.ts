@@ -1,15 +1,13 @@
-import { defineConfig } from 'tsup';
+import { defineConfig } from 'tsdown';
 
 export default defineConfig({
   entry: {
     index: 'src/index.ts',
     'visualization/index': 'src/visualization/index.ts',
   },
-  format: ['cjs', 'esm'],
+  format: ['esm', 'cjs'],
   dts: true,
-  splitting: false,
   sourcemap: true,
   clean: true,
   treeshake: true,
-  tsconfig: 'tsconfig.build.json',
 });
