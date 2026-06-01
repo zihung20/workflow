@@ -15,6 +15,7 @@ function loadWorkflow(): DesignerWorkflow {
         // Provide defaults for fields added after initial release
         actionSchemas: data.actionSchemas ?? {},
         contextSchemaBody: data.contextSchemaBody ?? '',
+        nodes: data.nodes ?? DEFAULT_WORKFLOW.nodes,
       };
     }
   } catch { /* ignore corrupt data */ }

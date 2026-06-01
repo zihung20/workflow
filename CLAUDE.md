@@ -286,49 +286,13 @@ After every code change:
 
 ## 5. Project Version History
 
-### [v0.1.0–v0.13.0] Foundation & API shape
-- Core library: `WorkflowBuilder`, `WorkflowEngine`, `WorkflowInstance`, `Guard` factory; four state types (`Step`/`Fork`/`Join`/`Wait`); Zod payload validation.
-- `createWorkflow()` factory (v0.7.0); `WaitState` rename (v0.8.0, breaking).
-- Mermaid + JSON-graph exporters (v0.9.0–v0.10.3); VitePress docs (v0.11.0).
-- Accumulating `TStates` builder — no upfront `states` array (v0.12.0, breaking); `createDynamicWorkflow()` escape hatch (v0.13.0).
-
-### [v0.14.0–v0.16.0] Context & history
-- Caller-owned typed context: `setContext(schema)` / `createInstance(id, ctx)` / `getContext()`; Zod validation; guard access via `ctx.context` (v0.14.0).
-- Conditional rest-params enforce required context at `createInstance` when schema is declared (v0.15.0).
-- `HistoryEntry<TContext>` / `InstanceSnapshot<TContext>` generics; `rewind(version)` returns a deep-cloned snapshot at any past version with accurate context (v0.16.0).
-
-### [v0.17.0–v0.19.0] Generic threading & performance
-- `TContext` threaded through `WorkflowDefinition` and `WorkflowEngine`; only remaining boundary cast is in `build()` (v0.17.0).
-- `TStates` threaded to `WorkflowInstance` and `Workflow`; `getCurrentStates()` / `getAvailableTransitions()` typed; `TStates = string` default preserves dynamic workflow compat (v0.18.0).
-- `getSnapshot()` 48× faster via delta-replay `rewind()` instead of storing full status snapshots; `tests/perf/` benchmark suite added; no-compat policy documented in Section 3 (v0.19.0).
-
-### [v0.20.0–v0.23.0] Fully typed dispatch surface
-- `TransitionSuccess` / `TransitionBlocked` carry `TStates`; `DispatchResult` threaded; delta-replay tests for `WaitState`, `resolveWait`, fork/join mid-execution (v0.20.0).
-- `TAction` added to `TransitionSuccess` / `TransitionBlocked` / `DispatchResult` so `result.action` narrows to the dispatched literal (v0.21.0).
-- `TStates` threaded to `ReadonlyInstanceState`, `HistoryEntry`, `InstanceSnapshot`, `GuardContext`, `GuardFn`, `FnGuard`, `injectGuard`, `resolveWait` (v0.22.0).
-- `TStates` threaded into `WorkflowEngine` itself and all internal helpers; last boundary cast in `WorkflowInstance.dispatch()` eliminated; remaining casts are all at unavoidable `Object.fromEntries` / type-erasure boundaries (v0.23.0).
-
-### [v0.24.0] 2026-05-29 — Code-quality pass
-- Deleted 6 "what" comments in `mermaid.ts`; removed cosmetic section-divider comments in `instance.ts`.
-- `kindSuffix()` switch made exhaustive: explicit `StateKind.Step` case replaces `default`, so a future new kind fails at compile time.
-- `getAvailableTransitions()` now uses `typedEntries` consistently (was using raw `Object.entries`).
-- Added TSDoc to `StateRegistry.has()`; added `@returns` tag to `Workflow.getDefinition()`.
-
+### [v0.1.0–v0.25.0 + web-runner v2.0] Cumulative history
+- **Core library (v0.1–v0.13):** `WorkflowBuilder` / `WorkflowEngine` / `WorkflowInstance` / `Guard`; four state kinds (`Step`/`Fork`/`Join`/`Wait`); Zod payload validation; `createWorkflow()` factory; Mermaid + JSON-graph exporters; VitePress docs; accumulating `TStates` builder (no upfront array); `createDynamicWorkflow()` escape hatch.
+- **Context & history (v0.14–v0.16):** `setContext(schema)` / `createInstance(id, ctx)` / `getContext()`; required-context enforcement at `createInstance`; `HistoryEntry<TContext>` / `InstanceSnapshot<TContext>` generics; `rewind(version)` deep-clones any past snapshot.
+- **Generic threading & perf (v0.17–v0.19):** `TContext` and `TStates` threaded through `WorkflowDefinition`, `WorkflowEngine`, `WorkflowInstance`, `Workflow`; `getCurrentStates()` / `getAvailableTransitions()` typed; `getSnapshot()` 48× faster via delta-replay; `tests/perf/` benchmark suite.
+- **Typed dispatch surface (v0.20–v0.23):** `TStates` and `TAction` on `DispatchResult` / `TransitionSuccess` / `TransitionBlocked`; full generic chain through `HistoryEntry`, `InstanceSnapshot`, `GuardContext`, `GuardFn`; last boundary cast in `WorkflowInstance.dispatch()` eliminated.
+- **Code quality (v0.24):** Exhaustive `kindSuffix()` switch; `typedEntries` used consistently; TSDoc gaps filled; "what" comments removed.
+- **Auto-complete inference (v0.25–v0.27):** Fork-target step states with no outgoing transitions are automatically completed on entry — logic lives in the engine's ForkState case (not in `WorkflowDefinition`). No user flag; the fork's own fan-out detects which targets have no work and completes them immediately, letting the downstream join activate via its `requires` list. `occ-disruption-sop.ts` updated: three `NOTIFY_*` actions removed, parallel notification phase resolves in one dispatch.
+- **Mermaid join edges (v0.26):** `MermaidExporter` now emits `req --> join` edges for every `JoinState.requires` entry — symmetric with the existing `fork --> target` edges. Both fork fan-out and join fan-in are now fully visible in the diagram without explicit transitions.
+- **web-runner v2.0 (2026-05-30):** Landing page, Examples page, full-canvas Visual Designer (bidirectional Monaco↔@xyflow/react sync, live run panel, IntelliSense from `.d.ts`); `@monaco-editor/react`, `monaco-editor`, `react-router-dom` added. Designer updated (2026-06-01): `autoComplete` checkbox for step nodes; join-requires visual edges auto-shown on canvas; drawing to a join auto-adds source to `requires`.
 233 tests; all pipeline steps clean.
-
-### [web-runner v2.0] 2026-05-30 — Full showcase website + Visual Designer
-**web-runner only — no changes to `flowyd/` library.**
-
-- **Landing page** (`pages/HomePage.tsx`): hero section with code snippet, 4 feature cards, example gallery cards, designer CTA.
-- **Examples page** (`pages/ExamplesPage.tsx`): React Router v6 routing; hash-based SPA with lazy-loaded pages.
-- **Visual Designer** (`pages/DesignerPage.tsx` + `designer/`):
-  - Interactive @xyflow/react canvas: drag nodes, draw transitions, delete with Backspace.
-  - Toolbar to add Step / Fork / Join / Wait nodes.
-  - Floating config panels for selected node (id, label, kind, initial/terminal, fork targets, join requires/mode, wait external name) and selected edge (action name, guard body).
-  - Canvas → Code sync: `codeGenerator.ts` emits canonical `createWorkflow()` TypeScript on every canvas change.
-  - Code → Canvas sync (debounced 500ms): Monaco TypeScript worker transpiles user code, `codeEvaluator.ts` executes via `new Function()` with injected flowyd/zod globals, reconciles canvas state.
-  - Bidirectional loop guard: `editSourceRef` prevents infinite canvas↔code update cycles.
-  - Run panel: click ▶ to evaluate current code and execute the workflow live using existing `SingleRunner`.
-- **Monaco Editor** (`designer/code/CodeEditor.tsx`): `@monaco-editor/react` + local workers via Vite `?worker`; hand-written ambient `flowyd` + `zod` type declarations registered via `addExtraLib` → full IntelliSense.
-- **Fixed workflow files**: removed stale `states: [...]` property from `createWorkflow()` in all four workflow files; fixed `predeparture.ts` fork-target ordering (branch states registered before the fork that references them).
-- **New deps**: `@monaco-editor/react@4.7.0`, `monaco-editor@0.52.2`, `react-router-dom@6.30.4`.

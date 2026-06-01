@@ -80,7 +80,7 @@ export function NodePanel({ node, workflow, onChange, onDelete }: Props) {
       </Field>
 
       <Field label="Flags">
-        <div className="flex gap-4 pt-0.5">
+        <div className="flex flex-wrap gap-4 pt-0.5">
           {([['isInitial', '▶ Initial'], ['isTerminal', '■ Terminal']] as const).map(([key, lbl]) => (
             <label key={key} className="flex items-center gap-2 cursor-pointer select-none text-xs text-foreground">
               <Checkbox

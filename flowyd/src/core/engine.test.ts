@@ -196,14 +196,16 @@ describe('Engine — Fork fan-out', () => {
     .addTransition({ from: 'start', to: 'fork', on: 'START' })
     .build();
 
-  it('activates all three targets when fork is entered', async () => {
+  it('activates all three targets when fork is entered and auto-completes them (no outgoing transitions)', async () => {
     const inst = forked.createInstance('fe-001');
     const result = await inst.dispatch('START', {});
     if (!result.success) {
       throw new Error('expected success');
     }
-    expect([...result.enteredStates].sort()).toEqual(['x', 'y', 'z']);
-    expect([...inst.getCurrentStates()].sort()).toEqual(['x', 'y', 'z']);
+    // x, y, z are fork targets with no outgoing transitions — they auto-complete,
+    // which lets the join activate in the same dispatch.
+    expect([...result.enteredStates].sort()).toEqual(['join', 'x', 'y', 'z']);
+    expect(inst.getCurrentStates()).toEqual(['join']);
   });
 
   it('fork state itself is never left in active status', async () => {

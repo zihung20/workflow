@@ -155,6 +155,9 @@ export class WorkflowBuilder<
    * valid target in subsequent `setInitial`, `setTerminal`, `addTransition`,
    * `addFork.targets`, and `addJoin.requires` calls.
    *
+   * Fork-target steps with no outgoing transitions are automatically completed
+   * on entry (inferred at `build()` time) — no extra option needed.
+   *
    * @param id      - Unique state identifier. Becomes part of `TStates` after this call.
    * @param options - Optional display label (defaults to `id`).
    * @returns The same builder with `TStates` widened to `TStates | K`.

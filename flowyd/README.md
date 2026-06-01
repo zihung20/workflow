@@ -117,7 +117,7 @@ const snapshot = inst.getSnapshot(); // plain JSON — save wherever you want
 - **Compile-time state ID safety** — `TStates` accumulates per `addStep`/`addFork`/`addJoin`/`addWait` call; typos caught immediately
 - **Typed actions and payloads** — `dispatch` and `canExecute` typed end-to-end from `defineAction`
 - **Zod-validated at every boundary** — runtime payload validation from the same schema
-- **Parallel branches** — `ForkState` fans out; `JoinState` synchronises (`all` / `any` / quorum)
+- **Parallel branches** — `ForkState` fans out; `JoinState` synchronises (`all` / `any` / quorum); `addStep({ autoComplete: true })` creates pass-through branches that resolve automatically so joins activate without explicit branch→join transitions
 - **External wait states** — `WaitState` pauses until `resolveWait` is called
 - **Purely functional persistence** — `getSnapshot()` / `restoreInstance()`, no storage opinions
 - **Typed instance context** — `setContext(schema)` makes context required at `createInstance` time; guards read it via `ctx.context`; `getContext()` returns `TContext | undefined` with no cast

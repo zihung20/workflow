@@ -87,6 +87,11 @@ export const MermaidExporter: IExporter<string> = {
           lines.push(`  ${sanitizeId(id)} --> ${sanitizeId(target)}`);
         }
       }
+      if (state.kind === StateKind.Join) {
+        for (const req of state.requires) {
+          lines.push(`  ${sanitizeId(req)} --> ${sanitizeId(id)}`);
+        }
+      }
     }
 
     for (const id of definition.terminalStateIds) {

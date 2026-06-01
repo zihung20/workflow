@@ -48,7 +48,7 @@ function wfToRfNodes(
 }
 
 function wfToRfEdges(wf: DesignerWorkflow): Edge[] {
-  return wf.edges.map(e => ({
+  const edges: Edge[] = wf.edges.map(e => ({
     id: e.id,
     source: e.fromNodeId,
     target: e.toNodeId,
@@ -61,6 +61,30 @@ function wfToRfEdges(wf: DesignerWorkflow): Edge[] {
     labelBgStyle: { fill: '#0f172a', fillOpacity: 0.9 },
     data: {} as Record<string, unknown>,
   }));
+
+  // Synthetic join-requires edges — visual only, not stored in wf.edges.
+  // Derived from node.joinRequires so they stay in sync with the NodePanel checkboxes.
+  for (const node of wf.nodes) {
+    if (node.kind !== 'join') continue;
+    for (const reqId of node.joinRequires) {
+      edges.push({
+        id: `__jr-${reqId}-${node.id}`,
+        source: reqId,
+        target: node.id,
+        label: '⑁ requires',
+        animated: false,
+        deletable: false,
+        selectable: false,
+        focusable: false,
+        style: { strokeDasharray: '5 3', stroke: '#0ea5e9', strokeWidth: 1.5 },
+        labelStyle: { fontSize: 11, fontFamily: 'monospace' },
+        labelBgStyle: { fill: '#0f172a', fillOpacity: 0.9 },
+        data: {} as Record<string, unknown>,
+      });
+    }
+  }
+
+  return edges;
 }
 
 let nodeCounter = 1;
@@ -153,6 +177,20 @@ export function DesignerCanvas({ workflow, selection, onWorkflowChange, onSelect
     const to = connection.target;
     if (!from || !to) return;
     const sourceNode = workflow.nodes.find(n => n.id === from);
+    const targetNode = workflow.nodes.find(n => n.id === to);
+
+    // Drawing to a join auto-adds the source to that join's requires list.
+    // A synthetic visual edge is rendered from node.joinRequires — no stored edge needed.
+    if (targetNode?.kind === 'join') {
+      const updatedNodes = workflow.nodes.map(n =>
+        n.id === to && !n.joinRequires.includes(from)
+          ? { ...n, joinRequires: [...n.joinRequires, from] }
+          : n,
+      );
+      onWorkflowChange({ ...workflow, nodes: updatedNodes });
+      return;
+    }
+
     const kind: DesignerEdge['kind'] = sourceNode?.kind === 'fork' ? 'fork-target' : 'transition';
     const newEdge: DesignerEdge = {
       id: `e-${from}-${to}-${Date.now()}`,
