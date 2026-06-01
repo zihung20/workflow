@@ -13,7 +13,11 @@ export default defineConfig({
   optimizeDeps: {
     include: ["flowyd", "flowyd/visualization"],
   },
+  esbuild: {
+    target: 'es2024',
+  },
   build: {
+    target: 'es2024',
     chunkSizeWarningLimit: 1000,
   },
 });

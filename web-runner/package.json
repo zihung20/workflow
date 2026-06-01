@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "tsx scripts/bundle-types.ts && vite",
     "build": "tsx scripts/bundle-types.ts && tsc --noEmit && vite build",
+    "build:pages": "tsx scripts/bundle-types.ts && tsc --noEmit && vite build --base=/flowyd/playground/",
     "preview": "vite preview",
     "bundle:types": "tsx scripts/bundle-types.ts"
   },
